@@ -7,7 +7,6 @@ def zmq_listener():
     ctx = zmq.Context()
     sock = ctx.socket(zmq.PULL)
     sock.bind("tcp://*:5556")
-    print(f"server listening at *:5556")
     while True:
         msg = sock.recv_json()
         received_data.append(msg)
