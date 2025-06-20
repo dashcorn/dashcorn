@@ -13,6 +13,7 @@ dependencies = [
     "uvicorn==0.32.0",
     "pyzmq>=27.0.0",
     "typer>=0.16.0",
+    "psutil>=7.0.0",
 ]
 
 [project.scripts]
