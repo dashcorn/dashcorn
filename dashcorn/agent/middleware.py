@@ -25,6 +25,7 @@ Example:
 Dependencies:
     - time: For high-resolution duration measurement and timestamps.
     - starlette.middleware.base.BaseHTTPMiddleware: For ASGI middleware structure.
+    - system_reporter.start_background_reporter: System reporter.
     - zmq_client.send_metric: For sending metrics to an external observer.
 
 This middleware is intended for use in performance monitoring, request tracking,
@@ -33,6 +34,7 @@ and operational observability.
 
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
+from .system_reporter import start_background_reporter
 from .zmq_client import send_metric
 
 class MetricsMiddleware(BaseHTTPMiddleware):
@@ -49,6 +51,23 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     Attributes:
         Inherits from BaseHTTPMiddleware and overrides the `dispatch` method.
     """
+
+    def __init__(self, app):
+        """
+        Initialize the MetricsMiddleware.
+
+        This sets up the middleware to intercept HTTP requests and also starts
+        a background system metrics reporter that periodically collects and sends
+        system-level metrics (e.g., CPU, memory).
+
+        Args:
+            app (ASGIApp): The ASGI application instance to wrap with the middleware.
+
+        Side Effects:
+            - Starts a background thread or task that sends system metrics every 5 seconds.
+        """
+        super().__init__(app)
+        start_background_reporter(interval=5.0)  # <-- chạy ngay khi khởi tạo middleware
 
     async def dispatch(self, request, call_next):
         """
