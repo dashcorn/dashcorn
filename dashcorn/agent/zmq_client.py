@@ -1,3 +1,40 @@
+"""
+zmq_client
+
+This module provides a simple ZeroMQ-based client for sending structured
+metric data to a monitoring server or dashboard.
+
+It uses a PUSH socket to connect to a predefined ZeroMQ endpoint
+(currently `tcp://127.0.0.1:5556`) and sends JSON-encoded metrics.
+
+This module is typically used by ASGI middleware, system reporters, or
+other components that need to emit runtime metrics such as request logs,
+resource usage, or custom events.
+
+Functions:
+    - send_metric(data: dict): Send a JSON-serializable metric dictionary over ZeroMQ.
+
+Global State:
+    - ctx (zmq.Context): The ZeroMQ context.
+    - sock (zmq.Socket): A PUSH socket connected to the dashboard server.
+
+Usage Example:
+    from zmq_client import send_metric
+
+    send_metric({
+        "type": "http",
+        "method": "POST",
+        "path": "/login",
+        "status": 200,
+        "duration": 0.456,
+        "time": 1718881234.567
+    })
+
+Notes:
+    - This module is designed for fire-and-forget metric reporting.
+    - For reliability in production, consider adding retries or persistent queues.
+"""
+
 import zmq
 import json
 
