@@ -32,10 +32,15 @@ This middleware is intended for use in performance monitoring, request tracking,
 and operational observability.
 """
 
+import os
+import psutil
+import logging
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from .system_reporter import start_background_reporter
 from .zmq_client import send_metric
+
+logger = logging.getLogger(__name__)
 
 class MetricsMiddleware(BaseHTTPMiddleware):
     """
@@ -67,6 +72,11 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             - Starts a background thread or task that sends system metrics every 5 seconds.
         """
         super().__init__(app)
+
+        self.worker_pid = os.getpid()
+        self.master_pid = psutil.Process(self.worker_pid).ppid()
+        logger.info(f"👷 [{self.__class__.__name__}] Worker PID: {self.worker_pid}, Parent (Master) PID: {self.master_pid}")
+
         start_background_reporter(interval=5.0)  # <-- chạy ngay khi khởi tạo middleware
 
     async def dispatch(self, request, call_next):
@@ -91,6 +101,8 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             "status": response.status_code,
             "duration": duration,
             "time": time.time(),
+            "worker_pid": self.worker_pid,
+            "master_pid": self.master_pid,
         })
 
         return response
