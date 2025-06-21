@@ -27,7 +27,8 @@ Dependencies:
 import threading
 import time
 import socket
-from .proc_inspector import get_all_worker_metrics
+
+from .proc_inspector import get_worker_metrics
 from .zmq_client import send_metric
 
 def report_worker_loop(interval: float = 5.0):
@@ -48,7 +49,7 @@ def report_worker_loop(interval: float = 5.0):
     hostname = socket.gethostname()
     while True:
         try:
-            metrics = get_all_worker_metrics()
+            metrics = get_worker_metrics()
             payload = {
                 "type": "worker_status",
                 "hostname": hostname,

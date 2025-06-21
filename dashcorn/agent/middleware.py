@@ -36,7 +36,9 @@ import os
 import psutil
 import logging
 import time
+
 from starlette.middleware.base import BaseHTTPMiddleware
+
 from .worker_reporter import start_background_reporter
 from .zmq_client import send_metric
 
@@ -74,10 +76,11 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
 
         self.worker_pid = os.getpid()
-        self.master_pid = psutil.Process(self.worker_pid).ppid()
-        logger.info(f"👷 [{self.__class__.__name__}] PID: {self.worker_pid}, Parent PID: {self.master_pid}")
+        self.parent_pid = psutil.Process(self.worker_pid).ppid()
 
-        start_background_reporter(interval=5.0)  # <-- chạy ngay khi khởi tạo middleware
+        logger.debug(f"👷 [{self.__class__.__name__}] PID: {self.worker_pid}, Parent PID: {self.parent_pid}")
+
+        start_background_reporter(interval=5.0)
 
     async def dispatch(self, request, call_next):
         """
@@ -102,7 +105,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             "duration": duration,
             "time": time.time(),
             "pid": self.worker_pid,
-            "master_pid": self.master_pid,
+            "parent_pid": self.parent_pid,
         })
 
         return response

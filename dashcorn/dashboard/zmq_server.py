@@ -33,21 +33,24 @@ Dependencies:
 
 import zmq
 import threading
+import logging
 import json
 
 from dashcorn.dashboard import db
 from dashcorn.dashboard.realtime import update_realtime_view
+
+logger = logging.getLogger(__name__)
 
 ZMQ_BIND_ADDR = "tcp://*:5556"
 
 def handle_message(msg: dict):
     msg_type = msg.get("type")
     if msg_type == "worker_status":
-        db.save_worker_info(msg)
-        update_realtime_view("worker", msg)
+        update_realtime_view("server", msg)
+        # db.save_worker_info(msg)
     elif msg_type == "http":
-        db.save_http_metric(msg)
         update_realtime_view("http", msg)
+        # db.save_http_metric(msg)
     else:
         print(f"[ZMQ] Unknown message type: {msg_type}")
 

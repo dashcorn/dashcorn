@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from dashcorn.dashboard.db import init_db
 from dashcorn.dashboard.zmq_server import start_listener
 
+import dashcorn.utils.logging
+
 app = FastAPI()
 
 init_db()

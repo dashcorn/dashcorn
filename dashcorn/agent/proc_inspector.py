@@ -57,8 +57,7 @@ def get_self_process_info() -> Dict:
     return get_process_info_of(os.getpid())
 
 def get_process_info_of(pid) -> Dict:
-    proc = psutil.Process(pid)
-    return extract_process_info(proc)
+    return extract_process_info(psutil.Process(pid))
 
 def extract_process_info(proc) -> Dict:
     return {
@@ -70,6 +69,17 @@ def extract_process_info(proc) -> Dict:
         "memory": proc.memory_info().rss,
         "start_time": proc.create_time(),
         "num_threads": proc.num_threads(),
+    }
+
+def get_worker_metrics() -> dict:
+    worker = get_self_process_info()
+    return {
+        "master": {
+            "pid": worker.get("parent_pid")
+        },
+        "workers": {
+            str(worker.get("pid")): worker
+        }
     }
 
 def find_uvicorn_workers(master_pid: int = None) -> List[Dict]:
@@ -148,5 +158,4 @@ def get_all_worker_metrics() -> Dict:
     return {
         "master": master,
         "workers": workers,
-        "num_workers": len(workers)
     }
