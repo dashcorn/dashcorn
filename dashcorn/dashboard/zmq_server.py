@@ -1,37 +1,55 @@
 """
-zmq_server
+zmq_server.py
 
-A lightweight ZeroMQ server for receiving and printing metrics from distributed
-clients (e.g., FastAPI/Gunicorn workers). This module listens on a configurable
-TCP port using a PULL socket, collects incoming JSON messages, and stores them
-in memory for inspection or further processing.
+This module provides a ZeroMQ-based listener for receiving real-time metrics
+from distributed agents. It is designed to work as part of the Dashcorn dashboard
+backend and supports asynchronous processing of various metric types including
+worker status and HTTP request data.
 
-Functions:
-    - zmq_listener(): Blocking loop that listens for incoming JSON messages via ZeroMQ.
-    - start_listener(): Launches the listener in a background daemon thread.
-
-Attributes:
-    - received_data (List[dict]): In-memory list of all received messages for debugging or testing.
+Main Components:
+----------------
+- `zmq_listener()`: A blocking loop that binds to a ZeroMQ socket and receives JSON-formatted metrics.
+- `handle_message(msg)`: Dispatches incoming messages based on their type and updates the dashboard.
+- `start_listener()`: Starts the listener in a background daemon thread.
 
 Usage:
-    Call `start_listener()` once at application startup or in a script to begin
-    receiving metrics.
+------
+Call `start_listener()` during application startup to enable real-time metric collection.
 
-Example:
-    >>> from zmq_server import start_listener
-    >>> start_listener()
-    >>> # Metrics will be printed to stdout and stored in `received_data`.
+ZeroMQ Configuration:
+---------------------
+- Protocol: PULL socket
+- Bind Address: tcp://*:5556
+- Agents should connect via PUSH socket to this address.
 
-Notes:
-    - Messages are expected to be sent using ZeroMQ's PUSH pattern (e.g., from zmq_client).
-    - This server is intended for development, testing, or prototyping purposes.
-    - For production, consider using persistent storage or integrating with a monitoring backend.
+Dependencies:
+-------------
+- zmq: ZeroMQ for messaging
+- threading: For running the listener in a background thread
+- json: To parse incoming messages
+- dashcorn.dashboard.db: Handles metric persistence
+- dashcorn.dashboard.realtime: Updates frontend views
 """
 
 import zmq
 import threading
+import json
 
-received_data = []
+from dashcorn.dashboard import db
+from dashcorn.dashboard.realtime import update_realtime_view
+
+ZMQ_BIND_ADDR = "tcp://*:5556"
+
+def handle_message(msg: dict):
+    msg_type = msg.get("type")
+    if msg_type == "worker_status":
+        db.save_worker_info(msg)
+        update_realtime_view("worker", msg)
+    elif msg_type == "http":
+        db.save_http_metric(msg)
+        update_realtime_view("http", msg)
+    else:
+        print(f"[ZMQ] Unknown message type: {msg_type}")
 
 def zmq_listener():
     """
@@ -46,12 +64,18 @@ def zmq_listener():
         - Uses the global `received_data` list to store received messages.
     """
     ctx = zmq.Context()
-    sock = ctx.socket(zmq.PULL)
-    sock.bind("tcp://*:5556")
+    socket = ctx.socket(zmq.PULL)
+    socket.bind(ZMQ_BIND_ADDR)
+    print(f"[ZMQ] Listening on {ZMQ_BIND_ADDR}...")
+
     while True:
-        msg = sock.recv_json()
-        received_data.append(msg)
-        print("Received metric:", msg)
+        try:
+            raw = socket.recv()
+            msg = json.loads(raw)
+            handle_message(msg)
+        except Exception as e:
+            print("[ZMQ] Error while receiving or processing message:", e)
+
 
 def start_listener():
     """

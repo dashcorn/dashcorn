@@ -1,6 +1,8 @@
 import typer
 import subprocess
+import httpx
 import os
+from datetime import datetime
 from pathlib import Path
 
 app = typer.Typer(help="Dashcorn – A real-time dashboard for FastAPI/Uvicorn applications")
@@ -18,8 +20,8 @@ def dashboard(
 def status():
     """Display current status (placeholder)"""
     typer.echo("📊 Dashcorn status (demo):")
-    typer.echo("- Dashboard running: Unknown (check port 5555)")
-    typer.echo("- Agent data sent: Use `/metrics` endpoint to verify")
+    typer.echo(" - Dashboard running: Unknown (check port 5555)")
+    typer.echo(" - Agent data sent: Use `/metrics` endpoint to verify")
     # Can be extended to read ZMQ socket or query endpoint in the future
 
 @app.command()
@@ -37,6 +39,36 @@ def install():
             typer.echo("✅ MetricsMiddleware successfully added to app.py.")
     else:
         typer.echo("⚠️ Could not find app.py to insert middleware.")
+
+@app.command()
+def show(kind: str = typer.Argument(..., help="master or workers")):
+    """
+    Show master or workers status from Dashcorn dashboard
+    """
+    try:
+        res = httpx.get("http://localhost:5555/metrics")
+        data = res.json()
+    except Exception as e:
+        typer.echo(f"❌ Failed to connect to dashboard: {e}")
+        raise typer.Exit(1)
+
+    for host, info in data.get("worker", {}).items():
+        typer.echo(f"\nHost: {host}")
+        if kind == "master":
+            master = info.get("master", {})
+            typer.echo(f"  PID: {master.get('pid')}")
+            typer.echo(f"  CPU: {master.get('cpu')}%")
+            typer.echo(f"  RAM: {master.get('memory') / 1024 / 1024:.2f} MB")
+            typer.echo(f"  Threads: {master.get('num_threads')}")
+            uptime = datetime.now().timestamp() - master.get("start_time", 0)
+            typer.echo(f"  Uptime: {uptime:.1f} seconds")
+        elif kind == "workers":
+            workers = info.get("workers", [])
+            typer.echo(f"  Total workers: {len(workers)}")
+            for w in workers:
+                typer.echo(f"    - PID: {w['pid']}, CPU: {w['cpu']}%, RAM: {w['memory'] / 1024 / 1024:.1f} MB, Status: {w['status']}")
+        else:
+            typer.echo(f"⚠️ Unknown type: {kind}. Use 'master' or 'workers'.")
 
 if __name__ == "__main__":
     app()
