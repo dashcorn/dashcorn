@@ -27,8 +27,8 @@ Dependencies:
 import threading
 import time
 import socket
-from dashcorn.agent.worker_inspector import get_all_worker_metrics
-from dashcorn.agent.zmq_client import send_metric
+from .proc_inspector import get_all_worker_metrics
+from .zmq_client import send_metric
 
 def report_worker_loop(interval: float = 5.0):
     """

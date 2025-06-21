@@ -36,7 +36,10 @@ This module is useful for lightweight observability in production Python web ser
 
 import os
 import psutil
+import logging
 from typing import List, Dict
+
+logger = logging.getLogger(__name__)
 
 def get_self_process_info() -> Dict:
     """
@@ -51,9 +54,17 @@ def get_self_process_info() -> Dict:
             - 'start_time': The start time of the process (as a UNIX timestamp).
             - 'num_threads': The number of threads used by the process.
     """
-    proc = psutil.Process(os.getpid())
+    return get_process_info_of(os.getpid())
+
+def get_process_info_of(pid) -> Dict:
+    proc = psutil.Process(pid)
+    return extract_process_info(proc)
+
+def extract_process_info(proc) -> Dict:
     return {
         "pid": proc.pid,
+        "parent_pid": proc.ppid(),
+        "name": proc.name(),
         "cmdline": proc.cmdline(),
         "cpu": proc.cpu_percent(interval=0.1),
         "memory": proc.memory_info().rss,
