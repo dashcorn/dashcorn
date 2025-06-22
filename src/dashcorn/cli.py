@@ -52,7 +52,7 @@ def show(kind: str = typer.Argument(..., help="master or workers")):
         typer.echo(f"❌ Failed to connect to dashboard: {e}")
         raise typer.Exit(1)
 
-    for host, info in data.get("worker", {}).items():
+    for host, info in data.get("server", {}).items():
         typer.echo(f"\nHost: {host}")
         if kind == "master":
             master = info.get("master", {})
@@ -65,8 +65,8 @@ def show(kind: str = typer.Argument(..., help="master or workers")):
         elif kind == "workers":
             workers = info.get("workers", [])
             typer.echo(f"  Total workers: {len(workers)}")
-            for w in workers:
-                typer.echo(f"    - PID: {w['pid']}, CPU: {w['cpu']}%, RAM: {w['memory'] / 1024 / 1024:.1f} MB, Status: {w['status']}")
+            for _, w in workers.items():
+                typer.echo(f"    - PID: {w.get('pid')}, CPU: {w.get('cpu')}%, RAM: {w.get('memory') / 1024 / 1024:.1f} MB")
         else:
             typer.echo(f"⚠️ Unknown type: {kind}. Use 'master' or 'workers'.")
 

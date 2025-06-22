@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from dashcorn.dashboard.db import init_db
+from dashcorn.dashboard.realtime_metrics import store
 from dashcorn.dashboard.zmq_server import start_listener
 
 import dashcorn.utils.logging
@@ -11,7 +12,6 @@ start_listener()
 
 @app.get("/metrics")
 def get_metrics():
-    from dashcorn.dashboard.realtime_metrics import store
     return store.dict()
 
 @app.get("/")
