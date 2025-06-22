@@ -1,32 +1,61 @@
-from dashcorn.utils.cache import ExpireOnSetCache
-
 import logging
+from typing import Any, Dict, Literal
+
+from dashcorn.utils.cache import ExpireOnSetCache
 
 logger = logging.getLogger(__name__)
 
-# Could be in-memory cache, or WebSocket broadcasting
-realtime_state = {
-    "http": [],
-    "server": {},
-}
+Kind = Literal["http", "server"]
 
-def update_realtime_view(kind: str, data: dict, log_store_event: bool = False):
-    if kind == "http":
-        realtime_state["http"].append(data)
-        if len(realtime_state["http"]) > 100:
-            realtime_state["http"] = realtime_state["http"][-100:]
-        if log_store_event:
-            logger.debug(f"http event has been appended to realtime_state['http']")
-    elif kind == "server":
-        hostname = data.get("hostname")
-        if not hostname:
+class RealtimeState:
+    def __init__(self, max_http_events: int = 100, worker_ttl: float = 5.0):
+        self._http_events: list[dict[str, Any]] = []
+        self._max_http_events = max_http_events
+        self._server_state: dict[str, ExpireOnSetCache[str, dict[str, Any]]] = {}
+        self._worker_ttl = worker_ttl
+
+    def update(self, kind: Kind, data: dict[str, Any], log_store_event: bool = False) -> None:
+        if kind == "http":
+            self._http_events.append(data)
+            if len(self._http_events) > self._max_http_events:
+                self._http_events = self._http_events[-self._max_http_events:]
             if log_store_event:
-                logger.debug(f"data: { data }")
-            return
-        if hostname not in realtime_state["server"]:
-            realtime_state["server"][hostname] = ExpireOnSetCache(ttl=5)
-        workers = data.get("workers", {})
-        for worker_id, worker in workers.items():
-            realtime_state["server"][hostname][worker_id] = worker
-        if log_store_event:
-            logger.debug(f"server state is updated into realtime_state['server'][{hostname}]")
+                logger.debug(f"HTTP event has been appended. Total = {len(self._http_events)}")
+
+        elif kind == "server":
+            hostname = data.get("hostname")
+            if not hostname:
+                if log_store_event:
+                    logger.debug(f"Missing hostname in server data: {data}")
+                return
+
+            if hostname not in self._server_state:
+                self._server_state[hostname] = ExpireOnSetCache(ttl=self._worker_ttl)
+
+            workers = data.get("workers", {})
+            for worker_id, worker_info in workers.items():
+                self._server_state[hostname][worker_id] = worker_info
+
+            if log_store_event:
+                logger.debug(f"Server state updated for {hostname} with {len(workers)} workers")
+
+    def get_http_events(self) -> list[dict[str, Any]]:
+        return self._http_events.copy()
+
+    def get_server_workers(self, hostname: str) -> dict[str, dict[str, Any]]:
+        cache = self._server_state.get(hostname)
+        if not cache:
+            return {}
+        return {k: v for k, v in cache.items()}
+
+    def get_all_servers(self) -> dict[str, dict[str, dict[str, Any]]]:
+        return {
+            hostname: {
+                worker_id: worker_data
+                for worker_id, worker_data in cache.items()
+            }
+            for hostname, cache in self._server_state.items()
+        }
+
+
+store = RealtimeState()

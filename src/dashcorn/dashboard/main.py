@@ -11,8 +11,8 @@ start_listener()
 
 @app.get("/metrics")
 def get_metrics():
-    from dashcorn.dashboard.realtime import realtime_state
-    return realtime_state
+    from dashcorn.dashboard.realtime import store
+    return store.get_all_servers()
 
 @app.get("/")
 def root():
