@@ -82,3 +82,31 @@ def test_clear_works():
     cache["y"] = 2
     cache.clear()
     assert len(cache) == 0
+
+def test_repr_debug():
+    cache = ExpireOnSetCache(ttl=5)
+    cache["a"] = 1
+    r = repr(cache)
+    assert "ttl=" in r and "size=1" in r
+
+def test_copy_creates_independent_copy():
+    cache = ExpireOnSetCache(ttl=5)
+    cache["a"] = 123
+    cache2 = cache.copy()
+    assert cache2["a"] == 123
+    cache2["a"] = 456
+    assert cache["a"] != cache2["a"]
+
+def test_maxsize_eviction():
+    expired = []
+
+    def on_expire(k, v):
+        expired.append(k)
+
+    cache = ExpireOnSetCache(ttl=5, maxsize=2, on_expire=on_expire)
+    cache["a"] = 1
+    cache["b"] = 2
+    cache["c"] = 3  # sẽ đẩy a ra
+
+    assert "a" not in cache
+    assert expired == ["a"]
