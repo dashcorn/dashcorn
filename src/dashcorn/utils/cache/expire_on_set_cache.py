@@ -1,23 +1,23 @@
 import time
 import threading
 from collections.abc import MutableMapping
-from typing import Callable, Optional, Any
+from typing import Any, Callable, Optional, Iterator, Tuple
 
-class ExpireOnSetCache(MutableMapping):
+T = Any
+K = Any
+V = Any
+ExpireCallback = Optional[Callable[[K, V], None]]
+
+class ExpireOnSetCache(MutableMapping[K, V]):
     def __init__(
         self,
         ttl: float,
-        on_expire: Optional[Callable[[Any, Any], None]] = None,
-        cleanup_interval: Optional[float] = None
-    ):
-        """
-        :param ttl: thời gian tồn tại (giây) kể từ lần `set()`
-        :param on_expire: callback(key, value) khi phần tử bị expire
-        :param cleanup_interval: nếu đặt, sẽ tự động cleanup định kỳ
-        """
-        self._ttl = ttl
-        self._store: dict[Any, tuple[Any, float]] = {}
-        self._on_expire = on_expire
+        on_expire: ExpireCallback = None,
+        cleanup_interval: Optional[float] = None,
+    ) -> None:
+        self._ttl: float = ttl
+        self._store: dict[K, Tuple[V, float]] = {}
+        self._on_expire: ExpireCallback = on_expire
         self._cleanup_interval = cleanup_interval
         self._cleanup_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -26,11 +26,11 @@ class ExpireOnSetCache(MutableMapping):
         if cleanup_interval:
             self._start_auto_cleanup()
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: K, value: V) -> None:
         with self._cleanup_lock:
             self._store[key] = (value, time.monotonic())
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: K) -> V:
         with self._cleanup_lock:
             value, set_time = self._store[key]
             if time.monotonic() - set_time > self._ttl:
@@ -38,27 +38,27 @@ class ExpireOnSetCache(MutableMapping):
                 raise KeyError(f"{key} has expired")
             return value
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: K) -> None:
         with self._cleanup_lock:
             del self._store[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[K]:
         self._cleanup()
         return iter(self._store)
 
-    def __len__(self):
+    def __len__(self) -> int:
         self._cleanup()
         return len(self._store)
 
-    def _expire_key(self, key, value):
+    def _expire_key(self, key: K, value: V) -> None:
         del self._store[key]
         if self._on_expire:
             try:
                 self._on_expire(key, value)
             except Exception:
-                pass  # Không để lỗi callback làm crash cache
+                pass  # không làm crash cache nếu callback lỗi
 
-    def _cleanup(self):
+    def _cleanup(self) -> None:
         now = time.monotonic()
         expired = []
         with self._cleanup_lock:
@@ -68,7 +68,7 @@ class ExpireOnSetCache(MutableMapping):
             for key, value in expired:
                 self._expire_key(key, value)
 
-    def _start_auto_cleanup(self):
+    def _start_auto_cleanup(self) -> None:
         if self._stop_event.is_set():
             return
         self._cleanup()
@@ -78,24 +78,24 @@ class ExpireOnSetCache(MutableMapping):
         self._timer_thread.daemon = True
         self._timer_thread.start()
 
-    def stop_auto_cleanup(self):
+    def stop_auto_cleanup(self) -> None:
         self._stop_event.set()
         if self._timer_thread:
             self._timer_thread.cancel()
 
-    def keys(self):
+    def keys(self) -> Iterator[K]:
         self._cleanup()
         return self._store.keys()
 
-    def items(self):
+    def items(self) -> Iterator[Tuple[K, V]]:
         self._cleanup()
         return ((k, v[0]) for k, v in self._store.items())
 
-    def values(self):
+    def values(self) -> Iterator[V]:
         self._cleanup()
         return (v[0] for v in self._store.values())
 
-    def get_set_time(self, key):
+    def get_set_time(self, key: K) -> Optional[float]:
         if key in self._store:
             return self._store[key][1]
         return None

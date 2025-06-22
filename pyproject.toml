@@ -32,3 +32,14 @@ lint = [
     "ruff<1.0.0,>=0.2.2",
     "pre-commit<4.0.0,>=3.6.2",
 ]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["demo", "src"]
+testpaths = ["tests"]
+python_files = "*_test.py"
