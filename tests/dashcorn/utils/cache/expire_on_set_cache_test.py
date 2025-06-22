@@ -56,3 +56,29 @@ def test_auto_cleanup():
     time.sleep(0.3)
     assert "x" in seen
     cache.stop_auto_cleanup()
+
+def test_update_and_pop():
+    cache = ExpireOnSetCache(ttl=5)
+    cache.update({"a": 1, "b": 2})
+    assert cache["a"] == 1
+    assert cache["b"] == 2
+
+    popped = cache.pop("a")
+    assert popped == 1
+    assert "a" not in cache
+
+def test_setdefault_behavior():
+    cache = ExpireOnSetCache(ttl=5)
+    val = cache.setdefault("x", 100)
+    assert val == 100
+    assert cache["x"] == 100
+
+    val2 = cache.setdefault("x", 200)
+    assert val2 == 100  # không thay đổi nếu đã tồn tại
+
+def test_clear_works():
+    cache = ExpireOnSetCache(ttl=5)
+    cache["x"] = 1
+    cache["y"] = 2
+    cache.clear()
+    assert len(cache) == 0

@@ -99,6 +99,38 @@ class ExpireOnSetCache(MutableMapping[K, V]):
         if key in self._store:
             return self._store[key][1]
         return None
+    
+    def update(self, other=None, **kwargs):
+        if other:
+            if isinstance(other, dict):
+                for k, v in other.items():
+                    self[k] = v
+            else:
+                for k, v in other:
+                    self[k] = v
+        for k, v in kwargs.items():
+            self[k] = v
+
+    def setdefault(self, key: K, default: V) -> V:
+        try:
+            return self[key]
+        except KeyError:
+            self[key] = default
+            return default
+
+    def pop(self, key: K, default: Optional[V] = None) -> V:
+        try:
+            value = self[key]  # may raise KeyError (expired)
+            del self[key]
+            return value
+        except KeyError:
+            if default is not None:
+                return default
+            raise
+
+    def clear(self):
+        with self._cleanup_lock:
+            self._store.clear()
 
 
 if __name__ == "__main__":
