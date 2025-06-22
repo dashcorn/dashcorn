@@ -1,6 +1,7 @@
 import time
 import threading
 from collections.abc import MutableMapping
+from collections import OrderedDict
 from typing import Any, Callable, Optional, Iterator, Tuple
 
 T = Any
@@ -14,11 +15,13 @@ class ExpireOnSetCache(MutableMapping[K, V]):
         ttl: float,
         on_expire: ExpireCallback = None,
         cleanup_interval: Optional[float] = None,
+        maxsize: Optional[int] = None,
     ) -> None:
         self._ttl: float = ttl
-        self._store: dict[K, Tuple[V, float]] = {}
+        self._store: OrderedDict[K, Tuple[V, float]] = OrderedDict()
         self._on_expire: ExpireCallback = on_expire
         self._cleanup_interval = cleanup_interval
+        self._maxsize = maxsize
         self._cleanup_lock = threading.Lock()
         self._stop_event = threading.Event()
         self._timer_thread: Optional[threading.Timer] = None
@@ -28,7 +31,36 @@ class ExpireOnSetCache(MutableMapping[K, V]):
 
     def __setitem__(self, key: K, value: V) -> None:
         with self._cleanup_lock:
-            self._store[key] = (value, time.monotonic())
+            now = time.monotonic()
+            self._store[key] = (value, now)
+            self._store.move_to_end(key)
+            self._evict_if_needed()
+
+    def _evict_if_needed(self) -> None:
+        if self._maxsize is not None:
+            while len(self._store) > self._maxsize:
+                k, (v, _) = self._store.popitem(last=False) # last ~ LIFO
+                if self._on_expire:
+                    try:
+                        self._on_expire(k, v)
+                    except Exception:
+                        pass
+
+    def copy(self) -> "ExpireOnSetCache[K, V]":
+        with self._cleanup_lock:
+            new_cache = ExpireOnSetCache(
+                ttl=self._ttl,
+                on_expire=self._on_expire,
+                cleanup_interval=self._cleanup_interval,
+                maxsize=self._maxsize
+            )
+            new_cache._store = OrderedDict(self._store.copy())
+            return new_cache
+
+    def __repr__(self) -> str:
+        self._cleanup()
+        keys = list(self._store.keys())
+        return f"<ExpireOnSetCache ttl={self._ttl}s size={len(self._store)} keys={keys}>"
 
     def __getitem__(self, key: K) -> V:
         with self._cleanup_lock:
