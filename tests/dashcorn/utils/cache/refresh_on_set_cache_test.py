@@ -97,13 +97,13 @@ def test_copy_creates_independent_copy():
     cache2["a"] = 456
     assert cache["a"] != cache2["a"]
 
-def test_maxsize_eviction():
+def test_maxlen_eviction():
     expired = []
 
     def on_expire(k, v):
         expired.append(k)
 
-    cache = RefreshOnSetCache(ttl=5, maxsize=2, on_expire=on_expire)
+    cache = RefreshOnSetCache(ttl=5, maxlen=2, on_expire=on_expire)
     cache["a"] = 1
     cache["b"] = 2
     cache["c"] = 3  # sẽ đẩy a ra
