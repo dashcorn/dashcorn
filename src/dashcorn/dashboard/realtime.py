@@ -1,3 +1,5 @@
+from dashcorn.utils.cache import ExpireOnSetCache
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,7 +24,9 @@ def update_realtime_view(kind: str, data: dict, log_store_event: bool = False):
                 logger.debug(f"data: { data }")
             return
         if hostname not in realtime_state["server"]:
-            realtime_state["server"][hostname] = {}
-        realtime_state["server"][hostname].update(data.get("workers", {}))
+            realtime_state["server"][hostname] = ExpireOnSetCache(ttl=5)
+        workers = data.get("workers", {})
+        for worker_id, worker in workers.items():
+            realtime_state["server"][hostname][worker_id] = worker
         if log_store_event:
             logger.debug(f"server state is updated into realtime_state['server'][{hostname}]")
