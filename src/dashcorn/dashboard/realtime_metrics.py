@@ -3,17 +3,17 @@ import logging
 from typing import Any, Literal
 from collections import deque
 
-from dashcorn.utils.cache import ExpireOnSetCache
+from dashcorn.utils.cache import RefreshOnSetCache
 
 logger = logging.getLogger(__name__)
 
 Kind = Literal["http", "server"]
 
 class RealtimeState:
-    def __init__(self, max_http_events: int = 100, worker_ttl: float = 5.0):
-        self._http_events: deque[dict[str, Any]] = deque(maxlen=max_http_events)
-        self._max_http_events = max_http_events
-        self._server_state: dict[str, ExpireOnSetCache[str, dict[str, Any]]] = {}
+    def __init__(self, http_events_maxlen: int = 100, worker_ttl: float = 5.0):
+        self._http_events: deque[dict[str, Any]] = deque(maxlen=http_events_maxlen)
+        self._http_events_maxlen = http_events_maxlen
+        self._server_state: dict[str, RefreshOnSetCache[str, dict[str, Any]]] = {}
         self._worker_ttl = worker_ttl
 
     def update(self, kind: Kind, data: dict[str, Any], log_store_event: bool = False) -> None:
@@ -30,7 +30,7 @@ class RealtimeState:
                 return
 
             if hostname not in self._server_state:
-                self._server_state[hostname] = ExpireOnSetCache(ttl=self._worker_ttl)
+                self._server_state[hostname] = RefreshOnSetCache(ttl=self._worker_ttl)
 
             workers = data.get("workers", {})
             for worker_id, worker_info in workers.items():

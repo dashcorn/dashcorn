@@ -9,19 +9,19 @@ K = Any
 V = Any
 ExpireCallback = Optional[Callable[[K, V], None]]
 
-class ExpireOnSetCache(MutableMapping[K, V]):
+class RefreshOnSetCache(MutableMapping[K, V]):
     def __init__(
         self,
         ttl: float,
+        maxlen: Optional[int] = None,
         on_expire: ExpireCallback = None,
         cleanup_interval: Optional[float] = None,
-        maxsize: Optional[int] = None,
     ) -> None:
         self._ttl: float = ttl
+        self._maxlen: Optional[int] = maxlen
         self._store: OrderedDict[K, Tuple[V, float]] = OrderedDict()
         self._on_expire: ExpireCallback = on_expire
         self._cleanup_interval = cleanup_interval
-        self._maxsize = maxsize
         self._cleanup_lock = threading.Lock()
         self._stop_event = threading.Event()
         self._timer_thread: Optional[threading.Timer] = None
@@ -37,8 +37,8 @@ class ExpireOnSetCache(MutableMapping[K, V]):
             self._evict_if_needed()
 
     def _evict_if_needed(self) -> None:
-        if self._maxsize is not None:
-            while len(self._store) > self._maxsize:
+        if self._maxlen is not None:
+            while len(self._store) > self._maxlen:
                 k, (v, _) = self._store.popitem(last=False) # last ~ LIFO
                 if self._on_expire:
                     try:
@@ -46,13 +46,13 @@ class ExpireOnSetCache(MutableMapping[K, V]):
                     except Exception:
                         pass
 
-    def copy(self) -> "ExpireOnSetCache[K, V]":
+    def copy(self) -> "RefreshOnSetCache[K, V]":
         with self._cleanup_lock:
-            new_cache = ExpireOnSetCache(
+            new_cache = RefreshOnSetCache(
                 ttl=self._ttl,
                 on_expire=self._on_expire,
                 cleanup_interval=self._cleanup_interval,
-                maxsize=self._maxsize
+                maxlen=self._maxlen
             )
             new_cache._store = OrderedDict(self._store.copy())
             return new_cache
@@ -60,7 +60,7 @@ class ExpireOnSetCache(MutableMapping[K, V]):
     def __repr__(self) -> str:
         self._cleanup()
         keys = list(self._store.keys())
-        return f"<ExpireOnSetCache ttl={self._ttl}s size={len(self._store)} keys={keys}>"
+        return f"<RefreshOnSetCache ttl={self._ttl}s size={len(self._store)} keys={keys}>"
 
     def __getitem__(self, key: K) -> V:
         with self._cleanup_lock:
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     def on_expire_demo(key, value):
         print(f"🔥 {key} expired with value = {value}")
 
-    cache = ExpireOnSetCache(ttl=3, on_expire=on_expire_demo, cleanup_interval=1.0)
+    cache = RefreshOnSetCache(ttl=3, on_expire=on_expire_demo, cleanup_interval=1.0)
 
     cache["a"] = 1
     cache["b"] = 2
