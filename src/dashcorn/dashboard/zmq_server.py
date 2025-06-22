@@ -37,7 +37,7 @@ import logging
 import json
 
 from dashcorn.dashboard import db
-from dashcorn.dashboard.realtime import store
+from dashcorn.dashboard.realtime_metrics import store
 
 logger = logging.getLogger(__name__)
 
