@@ -1,7 +1,6 @@
 import logging
 
 from typing import Any, Literal, Optional
-from collections import deque
 
 from dashcorn.utils.cache import ExpiringDeque
 from dashcorn.utils.cache import RefreshOnSetCache
@@ -22,7 +21,7 @@ class RealtimeState:
         self._http_events: ExpiringDeque[dict[str, Any]] = ExpiringDeque(
                 ttl=self._http_event_ttl,
                 maxlen=self._http_events_maxlen)
-        self._server_state: dict[str, RefreshOnSetCache[str, dict[str, Any]]] = {}
+        self._server_state = {} # dict[str, RefreshOnSetCache[str, dict[str, Any]]] = {}
         self._worker_ttl = worker_ttl
         self._workers_maxlen = workers_maxlen
         self._log_store_event = log_store_event
@@ -41,11 +40,19 @@ class RealtimeState:
                 return
 
             if hostname not in self._server_state:
-                self._server_state[hostname] = RefreshOnSetCache(ttl=self._worker_ttl, maxlen=self._workers_maxlen)
+                self._server_state[hostname] = {
+                    "master": {},
+                    "workers": RefreshOnSetCache(ttl=self._worker_ttl, maxlen=self._workers_maxlen),
+                }
+
+            _master = data.get("master", None)
+            if _master:
+                self._server_state[hostname]["master"] = _master
 
             workers = data.get("workers", {})
-            for worker_id, worker_info in workers.items():
-                self._server_state[hostname][worker_id] = worker_info
+            if workers:
+                for worker_id, worker_info in workers.items():
+                    self._server_state[hostname]["workers"][worker_id] = worker_info
 
             if self._log_store_event:
                 logger.debug(f"Server state updated for {hostname} with {len(workers)} workers")
@@ -55,16 +62,21 @@ class RealtimeState:
 
     def get_server_workers(self, hostname: str) -> dict[str, dict[str, Any]]:
         cache = self._server_state.get(hostname)
-        if not cache:
-            return {}
-        return {k: v for k, v in cache.items()}
+        return {
+            "master": cache.get("master", {}),
+            "workers": {
+                worker_id: worker_data
+                for worker_id, worker_data in cache.get("workers", {}).items()
+            }
+        } if cache else {}
 
     def get_all_servers(self) -> dict[str, dict[str, dict[str, Any]]]:
         return {
             hostname: {
+                "master": cache.get("master", {}),
                 "workers": {
                     worker_id: worker_data
-                    for worker_id, worker_data in cache.items()
+                    for worker_id, worker_data in cache.get("workers", {}).items()
                 }
             }
             for hostname, cache in self._server_state.items()

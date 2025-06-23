@@ -71,12 +71,15 @@ def extract_process_info(proc) -> Dict:
         "num_threads": proc.num_threads(),
     }
 
-def get_worker_metrics() -> dict:
+def get_worker_metrics(include_master: bool = True) -> dict:
     worker = get_self_process_info()
+    master_pid = worker.get("parent_pid")
+    if include_master and master_pid:
+        master = get_process_info_of(master_pid)
+    else:
+        master = {}
     return {
-        "master": {
-            "pid": worker.get("parent_pid")
-        },
+        "master": master,
         "workers": {
             str(worker.get("pid")): worker
         }

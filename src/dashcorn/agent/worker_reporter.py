@@ -1,5 +1,5 @@
 """
-system_exporter
+worker_reporter
 
 This module provides functionality to periodically collect and export system-level
 and worker process metrics to a monitoring backend. It is designed to run in the
@@ -19,7 +19,7 @@ Intended Use:
     to enable passive system observability without requiring external polling.
 
 Dependencies:
-    - `get_all_worker_metrics` from `worker_inspector` for process introspection.
+    - `get_worker_metrics` from `worker_inspector` for process introspection.
     - `send_metric` from `zmq_client` for metric transport.
     - `socket` for hostname resolution.
 """
@@ -46,17 +46,14 @@ def report_worker_loop(interval: float = 5.0):
     Note:
         This function is blocking and intended to be run in a background thread or task.
     """
-    hostname = socket.gethostname()
     while True:
         try:
-            metrics = get_worker_metrics()
-            payload = {
+            send_metric({
                 "type": "worker_status",
-                "hostname": hostname,
+                "hostname": socket.gethostname(),
                 "timestamp": time.time(),
-                **metrics,
-            }
-            send_metric(payload)
+                **get_worker_metrics(),
+            })
         except Exception as e:
             print("System reporter error:", e)
         time.sleep(interval)
