@@ -30,9 +30,9 @@ class SettingsPublisher:
 
         try:
             self._socket.bind(self._endpoint)
-            logger.debug(f"SettingsPublisher bound to {self._endpoint}")
+            logger.debug(f"[{self.__class__.__name__}] bound to {self._endpoint}")
         except Exception as e:
-            logger.warning(f"Failed to bind PUB socket on {self._endpoint}: {e}")
+            logger.warning(f"[{self.__class__.__name__}] Failed to bind PUB socket on {self._endpoint}: {e}")
 
     def publish(self, data: dict):
         """
@@ -43,9 +43,9 @@ class SettingsPublisher:
         try:
             time.sleep(self._delay)  # Ensure subscribers have time to connect
             self._socket.send_json(data)
-            logger.debug(f"Published data: {data}")
+            logger.debug(f"[{self.__class__.__name__}] Published data: {data}")
         except Exception as e:
-            logger.warning(f"Error publishing data via ZMQ: {e}")
+            logger.warning(f"[{self.__class__.__name__}] Error publishing data via ZMQ: {e}")
 
     def close(self):
         """Cleanly close the PUB socket."""
@@ -53,6 +53,6 @@ class SettingsPublisher:
             self._socket.close()
             if not self._is_shared_context:
                 self._context.term()
-            logger.debug("SettingsPublisher socket closed.")
+            logger.debug(f"[{self.__class__.__name__}] socket closed.")
         except Exception as e:
-            logger.warning(f"Error closing PUB socket: {e}")
+            logger.warning(f"[{self.__class__.__name__}] Error closing PUB socket: {e}")

@@ -75,6 +75,7 @@ def get_worker_metrics(leader: Optional[int] = None, include_master: bool = True
     worker = get_self_process_info()
     pid = worker.get("pid")
     master_pid = worker.get("parent_pid")
+    logger.debug(f"👷 pid: {pid} ~ leader: {leader} -> master_pid: {master_pid}")
     if include_master and master_pid and leader == pid:
         master = get_process_info_of(master_pid)
     else:

@@ -59,12 +59,12 @@ class SettingsListener():
     def _target(self):
         while not self._stop_event.is_set():
             try:
-                self._process()
+                self._listen()
             except zmq.ZMQError as e:
                 if e.errno == zmq.ETERM:
-                    logger.debug(f"[{self.__class__.__name__}] Context terminated.")
+                    logger.warning(f"[{self.__class__.__name__}] Context terminated.")
                 elif e.errno == zmq.ENOTSOCK:
-                    logger.debug(f"[{self.__class__.__name__}] Invalid socket.")
+                    logger.warning(f"[{self.__class__.__name__}] Invalid socket.")
                 else:
                     raise
 
