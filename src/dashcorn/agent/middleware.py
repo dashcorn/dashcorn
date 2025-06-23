@@ -12,24 +12,6 @@ Starlette or FastAPI applications. It captures key data about each request such 
 
 The collected metrics are sent using ZeroMQ to a monitoring server via the `send_metric`
 function, defined in the `zmq_client` module.
-
-Classes:
-    - MetricsMiddleware: A subclass of Starlette's BaseHTTPMiddleware that wraps
-      incoming requests to log and forward timing metrics.
-
-Example:
-    from metrics_middleware import MetricsMiddleware
-
-    app.add_middleware(MetricsMiddleware)
-
-Dependencies:
-    - time: For high-resolution duration measurement and timestamps.
-    - starlette.middleware.base.BaseHTTPMiddleware: For ASGI middleware structure.
-    - system_reporter.start_background_reporter: System reporter.
-    - zmq_client.send_metric: For sending metrics to an external observer.
-
-This middleware is intended for use in performance monitoring, request tracking,
-and operational observability.
 """
 
 import os
@@ -39,8 +21,10 @@ import time
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .worker_reporter import start_background_reporter
-from .zmq_client import send_metric
+from .zmq_client import MetricsSender
+from .settings_store import SettingsStore
+from .settings_listener import SettingsListener
+from .worker_reporter import WorkerReporter
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +59,23 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         """
         super().__init__(app)
 
-        self.worker_pid = os.getpid()
-        self.parent_pid = psutil.Process(self.worker_pid).ppid()
+        self._pid = os.getpid()
+        self._parent_pid = psutil.Process(self._pid).ppid()
 
-        logger.debug(f"👷 [{self.__class__.__name__}] PID: {self.worker_pid}, Parent PID: {self.parent_pid}")
+        logger.debug(f"👷 [{self.__class__.__name__}] PID: {self._pid}, Parent PID: {self._parent_pid}")
 
-        start_background_reporter(interval=5.0)
+        self._settings_store = SettingsStore()
+
+        self._settings_listener = SettingsListener(port=5557,
+                handle_message=self._settings_store.update_settings)
+        self._settings_listener.start()
+
+        self._metrics_sender = MetricsSender(port=5556)
+
+        self._worker_reporter = WorkerReporter(interval=4.0,
+            settings_store=self._settings_store,
+            metrics_sender=self._metrics_sender)
+        self._worker_reporter.start()
 
     async def dispatch(self, request, call_next):
         """
@@ -97,15 +92,15 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         duration = time.perf_counter() - start_time
 
-        send_metric({
+        self._metrics_sender.send({
             "type": "http",
             "method": request.method,
             "path": request.url.path,
             "status": response.status_code,
             "duration": duration,
             "time": time.time(),
-            "pid": self.worker_pid,
-            "parent_pid": self.parent_pid,
+            "pid": self._pid,
+            "parent_pid": self._parent_pid,
         })
 
         return response

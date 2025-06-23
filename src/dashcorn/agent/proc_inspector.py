@@ -37,7 +37,7 @@ This module is useful for lightweight observability in production Python web ser
 import os
 import psutil
 import logging
-from typing import List, Dict
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +71,18 @@ def extract_process_info(proc) -> Dict:
         "num_threads": proc.num_threads(),
     }
 
-def get_worker_metrics(include_master: bool = True) -> dict:
+def get_worker_metrics(leader: Optional[int] = None, include_master: bool = True) -> dict:
     worker = get_self_process_info()
+    pid = worker.get("pid")
     master_pid = worker.get("parent_pid")
-    if include_master and master_pid:
+    if include_master and master_pid and leader == pid:
         master = get_process_info_of(master_pid)
     else:
         master = {}
     return {
         "master": master,
         "workers": {
-            str(worker.get("pid")): worker
+            str(pid): worker
         }
     }
 

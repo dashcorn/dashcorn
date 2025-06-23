@@ -1,77 +1,97 @@
-"""
-worker_reporter
-
-This module provides functionality to periodically collect and export system-level
-and worker process metrics to a monitoring backend. It is designed to run in the
-background as part of an ASGI application (e.g., FastAPI with Gunicorn + Uvicorn).
-
-Features:
-- Periodically gathers metrics about the current process and its worker subprocesses.
-- Enriches metrics with hostname and timestamp.
-- Sends metrics over ZeroMQ to a dashboard or monitoring service using `send_metric`.
-
-Functions:
-    - report_worker_loop(interval: float): Main loop for collecting and sending metrics.
-    - start_background_reporter(interval: float): Launches the metrics reporter in a background thread.
-
-Intended Use:
-    This module is typically invoked from within middleware or at application startup
-    to enable passive system observability without requiring external polling.
-
-Dependencies:
-    - `get_worker_metrics` from `worker_inspector` for process introspection.
-    - `send_metric` from `zmq_client` for metric transport.
-    - `socket` for hostname resolution.
-"""
-
 import threading
 import time
 import socket
+import logging
+from typing import Optional
 
 from .proc_inspector import get_worker_metrics
-from .zmq_client import send_metric
+from .settings_store import SettingsStore
+from .zmq_client import MetricsSender
 
-def report_worker_loop(interval: float = 5.0):
+logger = logging.getLogger(__name__)
+
+class WorkerReporter:
     """
-    Periodically collect and send worker and system metrics in a loop.
+    Periodically collects and sends worker-level metrics to the dashboard via ZMQ.
 
-    This function runs indefinitely, collecting data about the master process
-    and its Uvicorn worker subprocesses at the specified interval. It formats
-    the data with metadata like hostname and timestamp, and sends it to the
-    monitoring system.
+    This class runs a background thread to send data like CPU, memory usage,
+    and thread count to the Dashcorn dashboard.
 
-    Args:
-        interval (float): Time interval (in seconds) between metric reports.
-
-    Note:
-        This function is blocking and intended to be run in a background thread or task.
+    Attributes:
+        interval (float): Interval in seconds between metric reports.
+        hostname (str): Hostname used to identify this worker.
+        sender (MetricsSender): The ZMQ sender used to push metrics.
     """
-    while True:
-        try:
-            send_metric({
-                "type": "worker_status",
-                "hostname": socket.gethostname(),
-                "timestamp": time.time(),
-                **get_worker_metrics(),
-            })
-        except Exception as e:
-            print("System reporter error:", e)
-        time.sleep(interval)
 
-def start_background_reporter(interval: float = 5.0):
-    """
-    Start a background thread to report system and worker metrics periodically.
+    def __init__(
+        self,
+        interval: float = 5.0,
+        settings_store: Optional[SettingsStore] = None,
+        metrics_sender: Optional[MetricsSender] = None,
+        hostname: Optional[str] = None,
+        logging_enabled: bool = False,
+    ):
+        """
+        Initialize the worker reporter.
 
-    This function initializes and starts a daemon thread that runs
-    `report_worker_loop` in the background, allowing the application to
-    continue serving requests while metrics are sent at regular intervals.
+        Args:
+            interval (float): How often to send metrics (in seconds).
+            metrics_sender (Optional[MetricsSender]): Optional external MetricsSender instance.
+            hostname (Optional[str]): Optional override of system hostname.
+        """
+        self._interval = interval
+        self._hostname = hostname or socket.gethostname()
+        self._settings_store = settings_store
+        self._metrics_sender = metrics_sender
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._logging_enabled = logging_enabled
 
-    Args:
-        interval (float): Time interval (in seconds) between metric reports.
+    def _run_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                if self._metrics_sender:
+                    metric = {
+                        "type": "worker_status",
+                        "hostname": self._hostname,
+                        "timestamp": time.time(),
+                        **get_worker_metrics(leader=self._settings_store.leader),
+                    }
+                    self._metrics_sender.send(metric)
+                    if self._logging_enabled:
+                        logger.debug(f"[WorkerReporter] Sent worker metrics: {metric}")
+                else:
+                    logger.warning(f"[WorkerReporter] metrics_sender is None")
+            except Exception as e:
+                logger.warning(f"[WorkerReporter] Failed to send metrics: {e}")
+            self._stop_event.wait(self._interval)
 
-    Note:
-        The thread runs as a daemon and will automatically exit when the main
-        process exits.
-    """
-    thread = threading.Thread(target=report_worker_loop, args=(interval,), daemon=True)
-    thread.start()
+    def start(self):
+        """
+        Start the background reporting thread.
+        """
+        if self._thread and self._thread.is_alive():
+            return  # Already running
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+        if self._logging_enabled:
+            logger.debug("[WorkerReporter] Reporter thread started.")
+
+    def stop(self):
+        """
+        Stop the background reporting thread.
+        """
+        if not self._thread or not self._thread.is_alive():
+            return
+        self._stop_event.set()
+        self._thread.join(timeout=self._interval + 1)
+        if self._logging_enabled:
+            logger.debug("[WorkerReporter] Reporter thread stopped.")
+
+    def restart(self):
+        """
+        Restart the background reporting thread.
+        """
+        self.stop()
+        self.start()

@@ -1,78 +1,84 @@
-"""
-zmq_client
-
-This module provides a simple ZeroMQ-based client for sending structured
-metric data to a monitoring server or dashboard.
-
-It uses a PUSH socket to connect to a predefined ZeroMQ endpoint
-(currently `tcp://127.0.0.1:5556`) and sends JSON-encoded metrics.
-
-This module is typically used by ASGI middleware, system reporters, or
-other components that need to emit runtime metrics such as request logs,
-resource usage, or custom events.
-
-Functions:
-    - send_metric(data: dict): Send a JSON-serializable metric dictionary over ZeroMQ.
-
-Global State:
-    - ctx (zmq.Context): The ZeroMQ context.
-    - sock (zmq.Socket): A PUSH socket connected to the dashboard server.
-
-Usage Example:
-    from zmq_client import send_metric
-
-    send_metric({
-        "type": "http",
-        "method": "POST",
-        "path": "/login",
-        "status": 200,
-        "duration": 0.456,
-        "time": 1718881234.567
-    })
-
-Notes:
-    - This module is designed for fire-and-forget metric reporting.
-    - For reliability in production, consider adding retries or persistent queues.
-"""
-
 import zmq
-import json
+import logging
 
-ctx = zmq.Context()
-sock = ctx.socket(zmq.PUSH)
-sock.connect("tcp://127.0.0.1:5556")  # Dashboard server
+from typing import Optional
 
-def send_metric(data: dict):
+logger = logging.getLogger(__name__)
+
+class MetricsSender:
     """
-    Send a metric to the monitoring or dashboard server via ZeroMQ.
+    A lightweight ZMQ PUSH sender for delivering metrics to the Dashcorn dashboard.
 
-    This function serializes the given dictionary as JSON and sends it
-    over a PUSH socket to a pre-configured ZeroMQ endpoint (e.g., tcp://127.0.0.1:5556).
-    It is typically used to report runtime metrics such as HTTP requests,
-    performance data, or other custom telemetry.
+    This class is used by agents running inside Uvicorn workers to push structured
+    JSON metrics to the central dashboard. It uses the ZeroMQ PUSH socket pattern,
+    designed to be fire-and-forget with minimal overhead.
 
-    Args:
-        data (dict): A dictionary representing the metric to be sent.
-                     It should be JSON-serializable.
-
-    Example:
-        send_metric({
-            "type": "http",
-            "method": "GET",
-            "path": "/api",
-            "status": 200,
-            "duration": 0.123,
-            "time": 1718880000.123
-        })
-
-    Notes:
-        If sending fails, the exception is caught and printed to stderr.
-        No retry or queue mechanism is implemented.
-
-    Raises:
-        None
+    Attributes:
+        host (str): The hostname of the dashboard (default "127.0.0.1").
+        port (int): The port of the dashboard's ZMQ PULL socket (default 5556).
+        context (zmq.Context): The ZMQ context used to create the socket.
+        logging_enabled (bool): Whether debug logging is enabled.
     """
-    try:
-        sock.send_json(data)
-    except Exception as e:
-        print("ZMQ send error:", e)
+
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 5556,
+        context: Optional[zmq.Context] = None,
+        logging_enabled: bool = False,
+    ):
+        """
+        Initialize the MetricsSender.
+
+        Args:
+            host (str): The IP address or hostname of the dashboard server.
+            port (int): The port number where the dashboard's ZMQ PULL socket is bound.
+            context (Optional[zmq.Context]): An optional shared ZMQ context. If None,
+                                             a new instance or singleton is used.
+            logging_enabled (bool): If True, enable debug logging of connection and sending.
+        """
+        self._host = host
+        self._port = port
+        self._endpoint = f"tcp://{self._host}:{self._port}"
+        self._context = context or zmq.Context.instance()
+        self._socket = self._context.socket(zmq.PUSH)
+        self._logging_enabled = logging_enabled
+
+        try:
+            self._socket.connect(self._endpoint)
+            if self._logging_enabled:
+                logger.debug(f"[MetricsSender] Connected to dashboard at {self._endpoint}")
+        except Exception as e:
+            logger.warning(f"[MetricsSender] Failed to connect to dashboard at {self._endpoint}: {e}")
+
+    def send(self, data: dict):
+        """
+        Send a metric payload to the dashboard.
+
+        The payload should be a serializable dictionary. This method will attempt
+        to encode it as JSON and send it over the ZMQ PUSH socket.
+
+        Args:
+            data (dict): The dictionary containing metric data to send.
+        """
+        try:
+            self._socket.send_json(data)
+            if self._logging_enabled:
+                logger.debug(f"[MetricsSender] Sent metric: {data}")
+        except Exception as e:
+            logger.warning(f"[MetricsSender] Failed to send metric via ZMQ: {e}")
+
+    def close(self):
+        """
+        Close the underlying ZMQ socket and context.
+
+        This method should be called when the sender is no longer needed
+        to ensure proper cleanup of ZMQ resources.
+        """
+        try:
+            self._socket.close()
+            self._context.term()
+            if self._logging_enabled:
+                logger.debug("[MetricsSender] ZMQ socket closed.")
+        except Exception as e:
+            logger.warning(f"[MetricsSender] Error closing socket: {e}")
