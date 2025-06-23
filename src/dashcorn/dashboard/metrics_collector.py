@@ -21,8 +21,8 @@ class MetricsCollector:
         :param bind_addr: ZMQ bind address, typically 'tcp://*:5556'
         """
         self._bind_addr = bind_addr
-        self._context = zmq.Context.instance()
-        self._socket = self._context.socket(zmq.PULL)
+        self._context = None
+        self._socket = None
         self._thread = None
         self._stop_event = threading.Event()
 
@@ -32,14 +32,13 @@ class MetricsCollector:
             logger.debug(f"[{self.__class__.__name__}] is already running.")
             return
 
-        self._context = zmq.Context.instance()
+        self._context = zmq.Context()
         self._socket = self._context.socket(zmq.PULL)
         try:
             self._socket.bind(self._bind_addr)
             logger.debug(f"[{self.__class__.__name__}] Listening on {self._bind_addr}...")
         except zmq.ZMQError as e:
-            logger.debug(f"[{self.__class__.__name__}] bind error: {e}")
-            return
+            logger.warning(f"[{self.__class__.__name__}] bind error: {e}")
 
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)

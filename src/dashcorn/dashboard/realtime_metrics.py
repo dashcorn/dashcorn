@@ -1,6 +1,6 @@
 import logging
 
-from typing import Any, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from dashcorn.utils.cache import ExpiringDeque
 from dashcorn.utils.cache import RefreshOnSetCache
@@ -43,6 +43,7 @@ class RealtimeState:
                 self._server_state[hostname] = {
                     "master": {},
                     "workers": RefreshOnSetCache(ttl=self._worker_ttl, maxlen=self._workers_maxlen),
+                    "last_index": -1,
                 }
 
             _master = data.get("master", None)
@@ -56,6 +57,32 @@ class RealtimeState:
 
             if self._log_store_event:
                 logger.debug(f"Server state updated for {hostname} with {len(workers)} workers")
+
+    def elect_leaders(self) -> List[Dict[str, Any]]:
+        """
+        Perform round-robin election over current live workers.
+        Returns:
+            pid of selected worker or None if no candidate found.
+        """
+        leaders = []
+
+        for hostname, cache in self._server_state.items():
+            candidates = []
+            for worker_id, worker in cache.get("workers",{}).items():
+                pid = worker.get("pid")
+                if pid:
+                    candidates.append(dict(hostname=hostname, leader=pid))
+
+            if not candidates:
+                logger.debug("No active workers found for leader election.")
+                continue
+
+            # Round-robin selection
+            _last_index = cache.get("last_index", -1)
+            cache["last_index"] = (_last_index + 1) % len(candidates)
+            leaders.append(candidates[_last_index])
+
+        return leaders
 
     def get_http_events(self) -> list[dict[str, Any]]:
         return list(self._http_events)
