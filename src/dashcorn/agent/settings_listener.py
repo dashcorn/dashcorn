@@ -59,7 +59,7 @@ class SettingsListener():
     def _target(self):
         while not self._stop_event.is_set():
             try:
-                self._listen()
+                self._process()
             except zmq.ZMQError as e:
                 if e.errno == zmq.ETERM:
                     logger.warning(f"[{self.__class__.__name__}] Context terminated.")

@@ -66,11 +66,8 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         self._settings_store = SettingsStore()
 
-        def update_settings_to_store(data):
-            self._settings_store.update_settings(data)
-
         self._settings_listener = SettingsListener(port=5557,
-                handle_message=update_settings_to_store)
+                handle_message=self._settings_store.update_settings)
         self._settings_listener.start()
 
         self._metrics_sender = MetricsSender(port=5556)

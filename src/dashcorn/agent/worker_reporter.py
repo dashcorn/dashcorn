@@ -59,11 +59,11 @@ class WorkerReporter:
                     }
                     self._metrics_sender.send(metric)
                     if self._logging_enabled:
-                        logger.debug(f"[WorkerReporter] Sent worker metrics: {metric}")
+                        logger.debug(f"[{self.__class__.__name__}] Sent worker metrics: {metric}")
                 else:
-                    logger.warning(f"[WorkerReporter] metrics_sender is None")
+                    logger.warning(f"[{self.__class__.__name__}] metrics_sender is None")
             except Exception as e:
-                logger.warning(f"[WorkerReporter] Failed to send metrics: {e}")
+                logger.warning(f"[{self.__class__.__name__}] Failed to send metrics: {e}")
             self._stop_event.wait(self._interval)
 
     def start(self):
@@ -76,7 +76,7 @@ class WorkerReporter:
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
         if self._logging_enabled:
-            logger.debug("[WorkerReporter] Reporter thread started.")
+            logger.debug(f"[{self.__class__.__name__}] Reporter thread started.")
 
     def stop(self):
         """
@@ -87,7 +87,7 @@ class WorkerReporter:
         self._stop_event.set()
         self._thread.join(timeout=self._interval + 1)
         if self._logging_enabled:
-            logger.debug("[WorkerReporter] Reporter thread stopped.")
+            logger.debug(f"[{self.__class__.__name__}] Reporter thread stopped.")
 
     def restart(self):
         """
