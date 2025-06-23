@@ -1,14 +1,17 @@
 from fastapi import FastAPI
-from dashcorn.dashboard.db import init_db
+
 from dashcorn.dashboard.realtime_metrics import store
-from dashcorn.dashboard.zmq_server import start_listener
+from dashcorn.dashboard.settings_publisher import SettingsPublisher
+from dashcorn.dashboard.metrics_collector import MetricsCollector
 
 import dashcorn.utils.logging
 
 app = FastAPI()
 
-init_db()
-start_listener()
+settings_publisher = SettingsPublisher()
+metrics_collector = MetricsCollector()
+
+metrics_collector.start()
 
 @app.get("/metrics")
 def get_metrics():
