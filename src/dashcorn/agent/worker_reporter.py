@@ -6,7 +6,7 @@ from typing import Optional
 
 from .proc_inspector import get_worker_metrics
 from .settings_store import SettingsStore
-from .zmq_client import MetricsSender
+from .worker_sender import MetricsSender
 
 logger = logging.getLogger(__name__)
 

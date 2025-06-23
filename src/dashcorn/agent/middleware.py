@@ -21,7 +21,7 @@ import time
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .zmq_client import MetricsSender
+from .worker_sender import MetricsSender
 from .settings_store import SettingsStore
 from .settings_listener import SettingsListener
 from .worker_reporter import WorkerReporter

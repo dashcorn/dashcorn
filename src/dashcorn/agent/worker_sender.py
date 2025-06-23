@@ -40,7 +40,8 @@ class MetricsSender:
         self._host = host
         self._port = port
         self._endpoint = f"tcp://{self._host}:{self._port}"
-        self._context = context or zmq.Context.instance()
+        self._is_shared_context = context is not None
+        self._context = context or zmq.Context()
         self._socket = self._context.socket(zmq.PUSH)
         self._logging_enabled = logging_enabled
 
@@ -77,7 +78,8 @@ class MetricsSender:
         """
         try:
             self._socket.close()
-            self._context.term()
+            if not self._is_shared_context:
+                self._context.term()
             if self._logging_enabled:
                 logger.debug(f"[{self.__class__.__name__}] Socket closed.")
         except Exception as e:
