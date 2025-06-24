@@ -17,7 +17,7 @@ class RealtimeState:
             master_ttl: float = 5.0,
             worker_ttl: float = 5.0,
             workers_maxlen: int = 100,
-            log_store_event: bool = False):
+            logging_enabled: bool = False):
         self._http_event_ttl = http_event_ttl
         self._http_events_maxlen = http_events_maxlen
         self._http_events: ExpiringDeque[dict[str, Any]] = ExpiringDeque(
@@ -27,18 +27,18 @@ class RealtimeState:
         self._master_ttl = master_ttl
         self._worker_ttl = worker_ttl
         self._workers_maxlen = workers_maxlen
-        self._log_store_event = log_store_event
+        self._logging_enabled = logging_enabled
 
     def update(self, kind: Kind, data: dict[str, Any]) -> None:
         if kind == "http":
             self._http_events.append(data)
-            if self._log_store_event:
+            if self._logging_enabled:
                 logger.debug(f"HTTP event has been appended. Total = {len(self._http_events)}")
 
         elif kind == "server":
             hostname = data.get("hostname")
             if not hostname:
-                if self._log_store_event:
+                if self._logging_enabled:
                     logger.debug(f"Missing hostname in server data: {data}")
                 return
 
@@ -58,7 +58,7 @@ class RealtimeState:
                 for worker_id, worker_info in workers.items():
                     self._server_state[hostname]["workers"][worker_id] = worker_info
 
-            if self._log_store_event:
+            if self._logging_enabled:
                 logger.debug(f"Server state updated for {hostname} with {len(workers)} workers")
 
     def elect_leaders(self) -> List[Dict[str, Any]]:
@@ -91,7 +91,9 @@ class RealtimeState:
         return list(self._http_events)
 
     def get_server_workers(self, hostname: str) -> dict[str, dict[str, Any]]:
-        cache = self._server_state.get(hostname)
+        return self._extract_server_state(self._server_state.get(hostname))
+
+    def _extract_server_state(self, cache) -> dict[str, dict[str, Any]]:
         return {
             "master": cache.get("master", {}),
             "workers": {
@@ -102,13 +104,7 @@ class RealtimeState:
 
     def get_all_servers(self) -> dict[str, dict[str, dict[str, Any]]]:
         return {
-            hostname: {
-                "master": cache.get("master", {}),
-                "workers": {
-                    worker_id: worker_data
-                    for worker_id, worker_data in cache.get("workers", {}).items()
-                }
-            }
+            hostname: self._extract_server_state(cache)
             for hostname, cache in self._server_state.items()
         }
 

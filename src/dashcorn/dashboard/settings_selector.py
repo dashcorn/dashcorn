@@ -49,7 +49,7 @@ class SettingsSelector:
     def stop(self):
         """Stop the leader election thread."""
         if not self._thread or not self._thread.is_alive():
-            logger.debug(f"[{self.__class__.__name__}] stopped.")
+            logger.debug(f"[{self.__class__.__name__}] has already stopped.")
             return
         self._stop_event.set()
         if self._thread:

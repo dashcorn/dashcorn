@@ -13,7 +13,8 @@ class SettingsPublisher:
 
     def __init__(self, host: str = "127.0.0.1", port: int = 5557,
             context: Optional[zmq.Context] = None,
-            delay_before_send: float = 1.0):
+            delay_before_send: float = 1.0,
+            publish_log_enabled: bool = False):
         """
         Initialize the ZMQ PUB publisher.
 
@@ -27,6 +28,7 @@ class SettingsPublisher:
         self._context = context or zmq.Context.instance()
         self._socket = self._context.socket(zmq.PUB)
         self._delay = delay_before_send
+        self._publish_log_enabled = publish_log_enabled
 
         try:
             self._socket.bind(self._endpoint)
@@ -43,7 +45,8 @@ class SettingsPublisher:
         try:
             time.sleep(self._delay)  # Ensure subscribers have time to connect
             self._socket.send_json(data)
-            logger.debug(f"[{self.__class__.__name__}] Published data: {data}")
+            if self._publish_log_enabled:
+                logger.debug(f"[{self.__class__.__name__}] Message: {data} published")
         except Exception as e:
             logger.warning(f"[{self.__class__.__name__}] Error publishing data via ZMQ: {e}")
 
