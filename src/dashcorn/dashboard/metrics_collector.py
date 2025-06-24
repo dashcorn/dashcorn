@@ -4,7 +4,10 @@ import logging
 import json
 import time
 
+from typing import Optional
+
 from dashcorn.dashboard.realtime_metrics import store
+from dashcorn.utils.zmq_util import Protocol, renew_zmq_ipc_socket
 
 logger = logging.getLogger(__name__)
 
@@ -14,13 +17,18 @@ class MetricsCollector:
     Designed to run in a background thread.
     """
 
-    def __init__(self, bind_addr: str = "tcp://*:5556"):
+    def __init__(self,
+            protocol: Protocol = "tcp",
+            address: Optional[str] = "*:5556",
+            endpoint: Optional[str] = None):
         """
         Initialize the MetricsCollector.
 
-        :param bind_addr: ZMQ bind address, typically 'tcp://*:5556'
+        :param endpoint: ZMQ bind address, typically 'tcp://*:5556'
         """
-        self._bind_addr = bind_addr
+        self._protocol = protocol
+        self._address = renew_zmq_ipc_socket(address, protocol)
+        self._endpoint = endpoint or f"{self._protocol}://{self._address}"
         self._context = None
         self._socket = None
         self._thread = None
@@ -35,10 +43,11 @@ class MetricsCollector:
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.PULL)
         try:
-            self._socket.bind(self._bind_addr)
-            logger.debug(f"[{self.__class__.__name__}] Listening on {self._bind_addr}...")
+            self._socket.bind(self._endpoint)
+            logger.debug(f"[{self.__class__.__name__}] Listening on {self._endpoint}...")
         except zmq.ZMQError as e:
             logger.warning(f"[{self.__class__.__name__}] bind error: {e}")
+            raise e
 
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
