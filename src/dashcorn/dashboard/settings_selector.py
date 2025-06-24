@@ -3,7 +3,7 @@ import time
 import logging
 from typing import Optional
 
-from dashcorn.dashboard.realtime_metrics import store
+from dashcorn.dashboard.realtime_metrics import RealtimeState
 from dashcorn.dashboard.settings_publisher import SettingsPublisher
 
 logger = logging.getLogger(__name__)
@@ -16,20 +16,24 @@ class SettingsSelector:
     """
 
     def __init__(self, interval: float = 5.0,
-            settings_publisher:Optional[SettingsPublisher] = None):
+            settings_publisher:Optional[SettingsPublisher] = None,
+            state_store: Optional[RealtimeState] = None):
         """
         :param interval: Time (in seconds) between leader elections.
         """
         self._interval = interval
         self._publisher = settings_publisher
+        self._state_store = state_store
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
 
     def _run_loop(self):
-        logger.debug(f"[{self.__class__.__name__}] loop started.")
+        if self._state_store is None:
+            logger.warning(f"[{self.__class__.__name__}] 'state_store' is None, loop is stopped")
+        logger.debug(f"[{self.__class__.__name__}] loop is running...")
         while not self._stop_event.is_set():
             try:
-                for control_packet in store.elect_leaders():
+                for control_packet in self._state_store.elect_leaders():
                     self._publisher.publish(control_packet)
                     logger.debug(f"[{self.__class__.__name__}] Published new packet: {control_packet}")
             except Exception as e:
@@ -48,9 +52,6 @@ class SettingsSelector:
 
     def stop(self):
         """Stop the leader election thread."""
-        if not self._thread or not self._thread.is_alive():
-            logger.debug(f"[{self.__class__.__name__}] has already stopped.")
-            return
         self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=2)

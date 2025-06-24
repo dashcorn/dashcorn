@@ -113,5 +113,3 @@ class RealtimeState:
             "http": self.get_http_events(),
             "server": self.get_all_servers(),
         }
-
-store = RealtimeState()

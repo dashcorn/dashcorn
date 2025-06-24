@@ -1,12 +1,11 @@
 import zmq
 import threading
 import logging
-import json
 import time
 
 from typing import Optional
 
-from dashcorn.dashboard.realtime_metrics import store
+from dashcorn.dashboard.realtime_metrics import RealtimeState
 from dashcorn.utils.zmq_util import Protocol, renew_zmq_ipc_socket
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,8 @@ class MetricsCollector:
     def __init__(self,
             protocol: Protocol = "tcp",
             address: Optional[str] = "*:5556",
-            endpoint: Optional[str] = None):
+            endpoint: Optional[str] = None,
+            state_store: Optional[RealtimeState] = None):
         """
         Initialize the MetricsCollector.
 
@@ -29,6 +29,7 @@ class MetricsCollector:
         self._protocol = protocol
         self._address = renew_zmq_ipc_socket(address, protocol)
         self._endpoint = endpoint or f"{self._protocol}://{self._address}"
+        self._state_store = state_store
         self._context = None
         self._socket = None
         self._thread = None
@@ -57,9 +58,7 @@ class MetricsCollector:
     def _run_loop(self):
         while not self._stop_event.is_set():
             try:
-                raw = self._socket.recv()
-                msg = json.loads(raw)
-                self._handle_message(msg)
+                self._handle_message(self._socket.recv_json())
             except Exception as e:
                 logger.warning(f"[{self.__class__.__name__}] Error while receiving or processing message: {e}")
                 time.sleep(0.5)
@@ -67,9 +66,11 @@ class MetricsCollector:
     def _handle_message(self, msg: dict):
         msg_type = msg.get("type")
         if msg_type == "worker_status":
-            store.update("server", msg)
+            if self._state_store:
+                self._state_store.update("server", msg)
         elif msg_type == "http":
-            store.update("http", msg)
+            if self._state_store:
+                self._state_store.update("http", msg)
         else:
             logger.warning(f"[{self.__class__.__name__}] Unknown message type: {msg_type}")
 
