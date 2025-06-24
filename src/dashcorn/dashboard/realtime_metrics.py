@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict, List, Literal, Optional
 
 from dashcorn.utils.cache import ExpiringDeque
+from dashcorn.utils.cache import ExpireIfIdleDict
 from dashcorn.utils.cache import RefreshOnSetCache
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,7 @@ class RealtimeState:
     def __init__(self,
             http_event_ttl: Optional[float] = 60.0,
             http_events_maxlen: Optional[int] = 10000,
+            master_ttl: float = 5.0,
             worker_ttl: float = 5.0,
             workers_maxlen: int = 100,
             log_store_event: bool = False):
@@ -22,6 +24,7 @@ class RealtimeState:
                 ttl=self._http_event_ttl,
                 maxlen=self._http_events_maxlen)
         self._server_state = {} # dict[str, RefreshOnSetCache[str, dict[str, Any]]] = {}
+        self._master_ttl = master_ttl
         self._worker_ttl = worker_ttl
         self._workers_maxlen = workers_maxlen
         self._log_store_event = log_store_event
@@ -41,14 +44,14 @@ class RealtimeState:
 
             if hostname not in self._server_state:
                 self._server_state[hostname] = {
-                    "master": {},
+                    "master": ExpireIfIdleDict(ttl=self._master_ttl),
                     "workers": RefreshOnSetCache(ttl=self._worker_ttl, maxlen=self._workers_maxlen),
                     "last_index": -1,
                 }
 
-            _master = data.get("master", None)
+            _master = data.get("master", {})
             if _master:
-                self._server_state[hostname]["master"] = _master
+                self._server_state[hostname]["master"].update(_master)
 
             workers = data.get("workers", {})
             if workers:
