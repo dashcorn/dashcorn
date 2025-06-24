@@ -22,7 +22,6 @@ def status():
     typer.echo("📊 Dashcorn status (demo):")
     typer.echo(" - Dashboard running: Unknown (check port 5555)")
     typer.echo(" - Agent data sent: Use `/metrics` endpoint to verify")
-    # Can be extended to read ZMQ socket or query endpoint in the future
 
 @app.command()
 def install():
@@ -56,12 +55,16 @@ def show(kind: str = typer.Argument(..., help="master or workers")):
         typer.echo(f"\nHost: {host}")
         if kind == "master":
             master = info.get("master", {})
+            if not master:
+                continue
             typer.echo(f"  PID: {master.get('pid')}")
             typer.echo(f"  CPU: {master.get('cpu')}%")
-            typer.echo(f"  RAM: {master.get('memory') / 1024 / 1024:.2f} MB")
+            typer.echo(f"  RAM: {master.get('memory', 0) / 1024 / 1024:.2f} MB")
             typer.echo(f"  Threads: {master.get('num_threads')}")
-            uptime = datetime.now().timestamp() - master.get("start_time", 0)
-            typer.echo(f"  Uptime: {uptime:.1f} seconds")
+            start_time = master.get("start_time", 0)
+            if start_time:
+                uptime = datetime.now().timestamp() - start_time
+                typer.echo(f"  Uptime: {uptime:.1f} seconds")
         elif kind == "workers":
             workers = info.get("workers", [])
             typer.echo(f"  Total workers: {len(workers)}")
