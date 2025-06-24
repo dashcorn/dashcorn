@@ -1,8 +1,9 @@
 import threading
 import time
-import socket
 import logging
 from typing import Optional
+
+from dashcorn.commons.agent_info_util import get_agent_id
 
 from .proc_inspector import get_worker_metrics
 from .settings_store import SettingsStore
@@ -19,7 +20,7 @@ class WorkerReporter:
 
     Attributes:
         interval (float): Interval in seconds between metric reports.
-        hostname (str): Hostname used to identify this worker.
+        agent_id (str): Hostname used to identify this worker.
         sender (MetricsSender): The ZMQ sender used to push metrics.
     """
 
@@ -28,7 +29,7 @@ class WorkerReporter:
         interval: float = 5.0,
         settings_store: Optional[SettingsStore] = None,
         metrics_sender: Optional[MetricsSender] = None,
-        hostname: Optional[str] = None,
+        agent_id: Optional[str] = None,
         logging_enabled: bool = False,
     ):
         """
@@ -37,10 +38,10 @@ class WorkerReporter:
         Args:
             interval (float): How often to send metrics (in seconds).
             metrics_sender (Optional[MetricsSender]): Optional external MetricsSender instance.
-            hostname (Optional[str]): Optional override of system hostname.
+            agent_id (Optional[str]): Optional override of system agent_id.
         """
         self._interval = interval
-        self._hostname = hostname or socket.gethostname()
+        self._agent_id = agent_id or get_agent_id()
         self._settings_store = settings_store
         self._metrics_sender = metrics_sender
         self._thread: Optional[threading.Thread] = None
@@ -53,7 +54,7 @@ class WorkerReporter:
                 if self._metrics_sender:
                     metric = {
                         "type": "worker_status",
-                        "hostname": self._hostname,
+                        "agent_id": self._agent_id,
                         "timestamp": time.time(),
                         **get_worker_metrics(leader=self._settings_store.leader),
                     }

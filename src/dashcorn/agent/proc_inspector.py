@@ -1,5 +1,5 @@
 """
-worker_inspector
+proc_inspector
 
 This module provides utilities for inspecting the current Python process and its
 Uvicorn or Gunicorn worker subprocesses. It is designed for environments where
@@ -10,26 +10,6 @@ Main functionalities:
 - Gather runtime information about the current process.
 - Detect and collect metrics from subprocesses running Uvicorn or Gunicorn.
 - Aggregate a summary of all relevant worker metrics for monitoring purposes.
-
-Functions:
-    - get_self_process_info() -> Dict:
-        Returns detailed process metrics for the current (master) process.
-
-    - find_uvicorn_workers(master_pid: int = None) -> List[Dict]:
-        Detects Uvicorn or Gunicorn worker subprocesses spawned by the given master PID.
-
-    - get_all_worker_metrics() -> Dict:
-        Returns a summary including the master process info and its active Uvicorn workers.
-
-Dependencies:
-    - psutil: Used for process inspection and metric collection.
-    - os: For retrieving the current process ID.
-
-Example usage:
-    >>> from worker_inspector import get_all_worker_metrics
-    >>> metrics = get_all_worker_metrics()
-    >>> print(metrics["num_workers"])
-    4
 
 This module is useful for lightweight observability in production Python web services.
 """
@@ -71,14 +51,14 @@ def extract_process_info(proc) -> Dict:
         "num_threads": proc.num_threads(),
     }
 
-def get_worker_metrics(leader: Optional[int] = None, include_master: bool = True) -> dict:
+def get_worker_metrics(leader: Optional[int] = None, include_master: bool = False) -> dict:
     worker = get_self_process_info()
     pid = worker.get("pid")
     master_pid = worker.get("parent_pid")
 
-    if include_master and master_pid and leader == pid:
+    if master_pid and (include_master or leader == pid):
         master = get_process_info_of(master_pid)
-        logger.debug(f"👷 pid: {pid} == leader: {leader} -> master_pid: {master_pid}")
+        logger.debug(f"👷 pid: {pid} == leader: {leader} -> selected leader: {pid}")
     else:
         master = {}
         logger.debug(f"👷 pid: {pid} <> leader: {leader} -x")

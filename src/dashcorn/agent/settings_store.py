@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 import time
 
+from dashcorn.commons.agent_info_util import get_agent_id
+
 @dataclass
 class SettingsStore:
     """
@@ -16,6 +18,7 @@ class SettingsStore:
     """
     leader: Optional[int] = None
     leader_since: float = field(default_factory=lambda: time.time())
+    agent_id: str = field(default_factory=lambda: get_agent_id())
 
     def update_leader(self, pid: int):
         """
@@ -44,7 +47,7 @@ class SettingsStore:
     def update_settings(self, data):
         if not isinstance(data, dict):
             return
-        _hostname = data.get("hostname", None)
+        _agent_id=data.get("agent_id", None)
         _leader = data.get("leader", None)
-        if _leader:
+        if _leader and self.agent_id == _agent_id:
             self.update_leader(_leader)

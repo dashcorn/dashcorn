@@ -36,14 +36,14 @@ class RealtimeState:
                 logger.debug(f"HTTP event has been appended. Total = {len(self._http_events)}")
 
         elif kind == "server":
-            hostname = data.get("hostname")
-            if not hostname:
+            agent_id = data.get("agent_id")
+            if not agent_id:
                 if self._logging_enabled:
-                    logger.debug(f"Missing hostname in server data: {data}")
+                    logger.debug(f"Missing agent_id in server data: {data}")
                 return
 
-            if hostname not in self._server_state:
-                self._server_state[hostname] = {
+            if agent_id not in self._server_state:
+                self._server_state[agent_id] = {
                     "master": ExpireIfIdleDict(ttl=self._master_ttl),
                     "workers": RefreshOnSetCache(ttl=self._worker_ttl, maxlen=self._workers_maxlen),
                     "last_index": -1,
@@ -51,15 +51,15 @@ class RealtimeState:
 
             _master = data.get("master", {})
             if _master:
-                self._server_state[hostname]["master"].update(_master)
+                self._server_state[agent_id]["master"].update(_master)
 
             workers = data.get("workers", {})
             if workers:
                 for worker_id, worker_info in workers.items():
-                    self._server_state[hostname]["workers"][worker_id] = worker_info
+                    self._server_state[agent_id]["workers"][worker_id] = worker_info
 
             if self._logging_enabled:
-                logger.debug(f"Server state updated for {hostname} with {len(workers)} workers")
+                logger.debug(f"Server state updated for {agent_id} with {len(workers)} workers")
 
     def elect_leaders(self) -> List[Dict[str, Any]]:
         """
@@ -69,12 +69,12 @@ class RealtimeState:
         """
         leaders = []
 
-        for hostname, cache in self._server_state.items():
+        for agent_id, cache in self._server_state.items():
             candidates = []
             for worker_id, worker in cache.get("workers",{}).items():
                 pid = worker.get("pid")
                 if pid:
-                    candidates.append(dict(hostname=hostname, leader=pid))
+                    candidates.append(dict(agent_id=agent_id, leader=pid))
 
             if not candidates:
                 logger.debug("No active workers found for leader election.")
@@ -90,8 +90,8 @@ class RealtimeState:
     def get_http_events(self) -> list[dict[str, Any]]:
         return list(self._http_events)
 
-    def get_server_workers(self, hostname: str) -> dict[str, dict[str, Any]]:
-        return self._extract_server_state(self._server_state.get(hostname))
+    def get_server_workers(self, agent_id: str) -> dict[str, dict[str, Any]]:
+        return self._extract_server_state(self._server_state.get(agent_id))
 
     def _extract_server_state(self, cache) -> dict[str, dict[str, Any]]:
         return {
@@ -104,8 +104,8 @@ class RealtimeState:
 
     def get_all_servers(self) -> dict[str, dict[str, dict[str, Any]]]:
         return {
-            hostname: self._extract_server_state(cache)
-            for hostname, cache in self._server_state.items()
+            agent_id: self._extract_server_state(cache)
+            for agent_id, cache in self._server_state.items()
         }
 
     def dict(self):
