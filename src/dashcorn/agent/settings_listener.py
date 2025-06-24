@@ -29,7 +29,6 @@ class SettingsListener():
         logger.debug(f"[{self.__class__.__name__}] Starting server thread...")
 
         self._stop_event.clear()
-
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.SUB)
         self._socket.connect(f"tcp://{self._host}:{self._port}")
@@ -41,6 +40,9 @@ class SettingsListener():
         logger.debug(f"[{self.__class__.__name__}] Server started.")
 
     def stop(self):
+        if not self._thread or not self._thread.is_alive():
+            logger.debug(f"[{self.__class__.__name__}] Server stopped.")
+            return
         logger.debug(f"[{self.__class__.__name__}] Stopping server thread...")
         self._stop_event.set()
         if self._thread:
