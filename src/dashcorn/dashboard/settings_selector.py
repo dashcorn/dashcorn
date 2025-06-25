@@ -16,7 +16,7 @@ class SettingsSelector:
     """
 
     def __init__(self, interval: float = 5.0,
-            settings_publisher:Optional[SettingsPublisher] = None,
+            settings_publisher: Optional[SettingsPublisher] = None,
             state_store: Optional[RealtimeState] = None):
         """
         :param interval: Time (in seconds) between leader elections.
