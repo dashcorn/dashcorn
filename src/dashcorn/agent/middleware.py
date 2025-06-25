@@ -22,6 +22,8 @@ import time
 from typing import Optional
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from dashcorn.commons.agent_info_util import get_agent_id
+
 from .config import AgentConfig
 from .worker_sender import MetricsSender
 from .settings_store import SettingsStore
@@ -65,6 +67,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         self._pid = os.getpid()
         self._parent_pid = psutil.Process(self._pid).ppid()
+        self._agent_id = get_agent_id()
 
         logger.debug(f"👷 [{self.__class__.__name__}] PID: {self._pid}, Parent PID: {self._parent_pid}")
 
@@ -110,6 +113,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             "time": time.time(),
             "pid": self._pid,
             "parent_pid": self._parent_pid,
+            "agent_id": self._agent_id,
         })
 
         return response

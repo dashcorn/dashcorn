@@ -13,7 +13,6 @@ def env_float(key: str, default: str = "5.0") -> float:
 
 @dataclass
 class AgentConfig:
-    agent_id: Optional[str] = field(default_factory=lambda: os.getenv("DASHCORN_AGENT_ID"))
     zmq_report_protocol: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_REPORT_PROTOCOL", "tcp"))
     zmq_report_addr: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_REPORT_ADDR", "127.0.0.1:5556"))
     zmq_control_protocol: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_CONTROL_PROTOCOL", "tcp"))
@@ -49,7 +48,7 @@ class AgentConfig:
         Return a detailed string representation of the config, helpful for debugging.
         """
         return (
-            f"<AgentConfig(agent_id={self.agent_id!r}, "
+            f"<AgentConfig("
             f"zmq_report_endpoint={self.zmq_report_endpoint}, "
             f"zmq_control_endpoint={self.zmq_control_endpoint}, "
             f"use_curve_auth={self.use_curve_auth}, "
