@@ -19,8 +19,10 @@ import psutil
 import logging
 import time
 
+from typing import Optional
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from .config import AgentConfig
 from .worker_sender import MetricsSender
 from .settings_store import SettingsStore
 from .settings_listener import SettingsListener
@@ -43,7 +45,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         Inherits from BaseHTTPMiddleware and overrides the `dispatch` method.
     """
 
-    def __init__(self, app):
+    def __init__(self, app, *args, config: Optional[AgentConfig]=None, **kwargs):
         """
         Initialize the MetricsMiddleware.
 
@@ -57,7 +59,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         Side Effects:
             - Starts a background thread or task that sends system metrics every 5 seconds.
         """
-        super().__init__(app)
+        super().__init__(app, *args, **kwargs)
+
+        self._config = config or AgentConfig()
 
         self._pid = os.getpid()
         self._parent_pid = psutil.Process(self._pid).ppid()
@@ -66,11 +70,16 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         self._settings_store = SettingsStore()
 
-        self._settings_listener = SettingsListener(port=5557,
+        self._settings_listener = SettingsListener(
+                address=self._config.zmq_control_addr,
+                protocol=self._config.zmq_control_protocol,
                 handle_message=self._settings_store.update_settings)
         self._settings_listener.start()
 
-        self._metrics_sender = MetricsSender(port=5556)
+        self._metrics_sender = MetricsSender(
+                address=self._config.zmq_report_addr,
+                protocol=self._config.zmq_report_protocol,
+                logging_enabled=self._config.enable_logging)
 
         self._worker_reporter = WorkerReporter(interval=4.0,
             settings_store=self._settings_store,
