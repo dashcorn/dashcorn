@@ -3,6 +3,8 @@ import logging
 
 from typing import Optional
 
+from dashcorn.utils.zmq_util import Protocol
+
 logger = logging.getLogger(__name__)
 
 class MetricsSender:
@@ -22,8 +24,11 @@ class MetricsSender:
 
     def __init__(
         self,
+        protocol: Protocol = "tcp",
         host: str = "127.0.0.1",
         port: int = 5556,
+        address: Optional[str] = None,
+        endpoint: Optional[str] = None,
         context: Optional[zmq.Context] = None,
         logging_enabled: bool = False,
     ):
@@ -37,9 +42,11 @@ class MetricsSender:
                                              a new instance or singleton is used.
             logging_enabled (bool): If True, enable debug logging of connection and sending.
         """
+        self._protocol = protocol
         self._host = host
         self._port = port
-        self._endpoint = f"tcp://{self._host}:{self._port}"
+        self._address = address or f"{self._host}:{self._port}"
+        self._endpoint = endpoint or f"{self._protocol}://{self._address}"
         self._is_shared_context = context is not None
         self._context = context or zmq.Context()
         self._socket = self._context.socket(zmq.PUSH)

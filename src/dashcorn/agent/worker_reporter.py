@@ -83,10 +83,9 @@ class WorkerReporter:
         """
         Stop the background reporting thread.
         """
-        if not self._thread or not self._thread.is_alive():
-            return
         self._stop_event.set()
-        self._thread.join(timeout=self._interval + 1)
+        if self._thread:
+            self._thread.join(timeout=self._interval + 1)
         if self._logging_enabled:
             logger.debug(f"[{self.__class__.__name__}] Reporter thread stopped.")
 
