@@ -1,0 +1,103 @@
+import time
+from collections import defaultdict
+from prometheus_client.core import (
+    GaugeMetricFamily,
+    CounterMetricFamily,
+    HistogramMetricFamily,
+)
+
+class PrometheusExporter:
+    def __init__(self, state_provider):
+        """
+        state_provider: Callable không đối số, trả về dict RealtimeState.
+        Cấu trúc gồm:
+            - 'http': list các requests
+            - 'server': dict agent_id -> {master, workers}
+        """
+        self._state_provider = state_provider
+
+    def collect(self):
+        state = self._state_provider()
+        now = time.time()
+
+        # ============ Worker + Master metrics ============
+        cpu_total = defaultdict(float)
+        mem_total = defaultdict(float)
+        worker_count = defaultdict(int)
+
+        for agent_id, info in state.get_all_servers().items():
+            workers = info.get("workers", {})
+            master = info.get("master", {})
+
+            for pid_str, w in workers.items():
+                labels = [agent_id, pid_str]
+
+                g = GaugeMetricFamily(
+                    "uvicorn_worker_cpu_percent",
+                    "CPU usage (%) per worker",
+                    labels=["agent_id", "pid"]
+                )
+                g.add_metric(labels, w.get("cpu", 0.0))
+                yield g
+
+                g2 =GaugeMetricFamily(
+                    "uvicorn_worker_memory_bytes",
+                    "Memory usage in bytes",
+                    labels=["agent_id", "pid"]
+                )
+                g2.add_metric(labels, w.get("memory", 0.0))
+                yield g2
+
+                g3 = GaugeMetricFamily(
+                    "uvicorn_worker_thread_count",
+                    "Thread count per worker",
+                    labels=["agent_id", "pid"]
+                )
+                g3.add_metric(labels, w.get("num_threads", 0))
+                yield g3
+
+                uptime = max(0, now - w.get("start_time", now))
+                g4 = GaugeMetricFamily(
+                    "uvicorn_worker_uptime_seconds",
+                    "Worker uptime in seconds",
+                    labels=["agent_id", "pid"]
+                )
+                g4.add_metric(labels, uptime)
+                yield g4
+
+                cpu_total[agent_id] += w.get("cpu", 0.0)
+                mem_total[agent_id] += w.get("memory", 0.0)
+                worker_count[agent_id] += 1
+
+            if "start_time" in master:
+                master_pid = str(master.get("pid", "master"))
+                uptime = max(0, now - master["start_time"])
+                g5 = GaugeMetricFamily(
+                    "uvicorn_master_uptime_seconds",
+                    "Uptime of master process",
+                    labels=["agent_id", "master_pid"]
+                )
+                g5.add_metric([agent_id, master_pid], uptime)
+                yield g5
+
+        for agent_id in cpu_total:
+            g6 = GaugeMetricFamily(
+                "uvicorn_total_cpu_percent",
+                "Total CPU usage (%) per agent",
+                labels=["agent_id"])
+            g6.add_metric([agent_id], cpu_total[agent_id])
+            yield g6
+
+            g7 = GaugeMetricFamily(
+                "uvicorn_total_memory_bytes",
+                "Total memory usage (bytes) per agent",
+                labels=["agent_id"])
+            g7.add_metric([agent_id], mem_total[agent_id])
+            yield g7
+
+            g8 = GaugeMetricFamily(
+                "uvicorn_active_worker_count",
+                "Number of active workers",
+                labels=["agent_id"])
+            g8.add_metric([agent_id], worker_count[agent_id])
+            yield g8

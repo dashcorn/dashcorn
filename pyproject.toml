@@ -16,6 +16,7 @@ dependencies = [
     "psutil>=7.0.0",
     "platformdirs>=4.3.8",
     "colorlog>=6.9.0",
+    "prometheus-client>=0.22.1",
 ]
 
 [project.scripts]
@@ -42,4 +43,4 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["demo", "src"]
 testpaths = ["tests"]
-python_files = "*_test.py"
+python_files = ["test_*.py", "*_test.py"]
