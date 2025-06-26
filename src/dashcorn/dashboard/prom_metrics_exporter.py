@@ -26,7 +26,7 @@ class PromMetricsExporter:
         self._accum_by_worker = defaultdict(int)
         self._accum_duration_sum = defaultdict(float)
         self._accum_duration_count = defaultdict(int)
-        self.in_progress = defaultdict(int)
+        self._accum_in_progress = defaultdict(int)
         self._lock = threading.Lock()
 
     def aggregate_http_events(self):
@@ -34,7 +34,7 @@ class PromMetricsExporter:
         now = time.time()
 
         with self._lock:
-            self.in_progress = defaultdict(int)
+            self._accum_in_progress = defaultdict(int)
 
         for req in state.get_http_events(cleancut=True):
             agent_id = req.get("agent_id", None)
@@ -54,7 +54,7 @@ class PromMetricsExporter:
                 self._accum_duration_sum[(agent_id, method, path)] += duration
                 self._accum_duration_count[(agent_id, method, path)] += 1
                 if now - req["time"] < 4:
-                    self.in_progress[(agent_id, method, path)] += 1
+                    self._accum_in_progress[(agent_id, method, path)] += 1
 
     def collect(self):
         # ============ Request metrics ============
@@ -97,7 +97,7 @@ class PromMetricsExporter:
                 labels={"agent_id": agent_id, "method": method, "path": path},
             )
 
-        for (agent_id, method, path), value in self.in_progress.items():
+        for (agent_id, method, path), value in self._accum_in_progress.items():
             req_in_progress.add_metric([agent_id, method, path], value)
 
         yield req_total
