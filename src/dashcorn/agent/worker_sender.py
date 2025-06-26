@@ -55,9 +55,9 @@ class MetricsSender:
         try:
             self._socket.connect(self._endpoint)
             if self._logging_enabled:
-                logger.debug(f"[{self.__class__.__name__}] Connected to dashboard at {self._endpoint}")
+                logger.debug(f"[{self.__class__.__name__}] connected to dashboard at {self._endpoint}")
         except Exception as e:
-            logger.warning(f"[{self.__class__.__name__}] Failed to connect to dashboard at {self._endpoint}: {e}")
+            logger.warning(f"[{self.__class__.__name__}] failed to connect to dashboard at {self._endpoint}: {e}")
 
     def send(self, data: dict):
         """
@@ -72,9 +72,9 @@ class MetricsSender:
         try:
             self._socket.send_json(data)
             if self._logging_enabled:
-                logger.debug(f"[{self.__class__.__name__}] Sent metric: {data}")
+                logger.debug(f"[{self.__class__.__name__}] sent metric: {data}")
         except Exception as e:
-            logger.warning(f"[{self.__class__.__name__}] Failed to send metric via ZMQ: {e}")
+            logger.warning(f"[{self.__class__.__name__}] failed to send metric via ZMQ: {e}")
 
     def close(self):
         """
@@ -88,6 +88,6 @@ class MetricsSender:
             if not self._is_shared_context:
                 self._context.term()
             if self._logging_enabled:
-                logger.debug(f"[{self.__class__.__name__}] Socket closed.")
+                logger.debug(f"[{self.__class__.__name__}] socket closed.")
         except Exception as e:
-            logger.warning(f"[{self.__class__.__name__}] Error closing socket: {e}")
+            logger.warning(f"[{self.__class__.__name__}] error closing socket: {e}")

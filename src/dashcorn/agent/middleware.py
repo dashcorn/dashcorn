@@ -19,8 +19,12 @@ import psutil
 import logging
 import time
 
-from typing import Optional
+from collections.abc import Iterable
+from typing import Awaitable, Callable, Optional
+
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from dashcorn.commons.agent_info_util import get_agent_id
 
@@ -47,7 +51,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         Inherits from BaseHTTPMiddleware and overrides the `dispatch` method.
     """
 
-    def __init__(self, app, *args, config: Optional[AgentConfig]=None, **kwargs):
+    def __init__(self, app, *args, config: Optional[AgentConfig]=None,
+            normalize_path: Optional[Callable]=None,
+            **kwargs):
         """
         Initialize the MetricsMiddleware.
 
@@ -64,6 +70,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         super().__init__(app, *args, **kwargs)
 
         self._config = config or AgentConfig()
+        self._normalize_path = normalize_path
 
         self._pid = os.getpid()
         self._parent_pid = psutil.Process(self._pid).ppid()
@@ -89,7 +96,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             metrics_sender=self._metrics_sender)
         self._worker_reporter.start()
 
-    async def dispatch(self, request, call_next):
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         """
         Intercept the HTTP request, measure its processing time, and send metrics.
 
@@ -101,19 +108,37 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             Response: The HTTP response returned by the next handler.
         """
         start_time = time.perf_counter()
-        response = await call_next(request)
-        duration = time.perf_counter() - start_time
-
-        self._metrics_sender.send({
-            "type": "http",
-            "method": request.method,
-            "path": request.url.path,
-            "status": response.status_code,
-            "duration": duration,
-            "time": time.time(),
-            "pid": self._pid,
-            "parent_pid": self._parent_pid,
-            "agent_id": self._agent_id,
-        })
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            response = Response("Internal Server Error", status_code=500)
+            raise exc
+        finally:
+            duration = time.perf_counter() - start_time
+            self._metrics_sender.send({
+                "type": "http",
+                "method": request.method,
+                "path": get_route_path(request, self._normalize_path),
+                "status": response.status_code,
+                "duration": duration,
+                "time": time.time(),
+                "pid": self._pid,
+                "parent_pid": self._parent_pid,
+                "agent_id": self._agent_id,
+            })
 
         return response
+
+def get_route_path(request, normalize: Optional[Callable]=None, safe_check: bool = True):
+    if not safe_check:
+        return request.scope.get("route").path if "route" in request.scope else request.url.path
+
+    route_path = None
+    if hasattr(request, "scope") and isinstance(request.scope, Iterable):
+        route_path = getattr(request.scope.get("route", object()), "path", None)
+    if route_path is None:
+        if callable(normalize):
+            route_path = normalize(request.url.path)
+        else:
+            route_path = "?"
+    return route_path
