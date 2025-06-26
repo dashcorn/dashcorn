@@ -11,7 +11,7 @@ from prometheus_client.core import (
 
 logger = logging.getLogger(__name__)
 
-class PrometheusExporter:
+class PromMetricsExporter:
     def __init__(self, state_provider, enable_logging: bool = False):
         """
         state_provider: Callable không đối số, trả về dict RealtimeState.

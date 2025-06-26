@@ -6,9 +6,9 @@ from dashcorn.dashboard.settings_selector import SettingsSelector
 from dashcorn.dashboard.settings_publisher import SettingsPublisher
 from dashcorn.dashboard.metrics_collector import MetricsCollector
 
-from dashcorn.dashboard.prom_exporter import PrometheusExporter
+from dashcorn.dashboard.prom_metrics_exporter import PromMetricsExporter
 from dashcorn.dashboard.prom_metrics_scheduler import PromMetricsScheduler
-from dashcorn.dashboard.prom_http_server import PrometheusHttpServer
+from dashcorn.dashboard.prom_metrics_server import PromMetricsServer
 
 import dashcorn.utils.logging
 
@@ -29,12 +29,12 @@ metrics_collector = MetricsCollector(state_store=store,
     address=config.zmq_pull_metrics_address,
 )
 
-prom_metrics_exporter = PrometheusExporter(lambda: store)
+prom_metrics_exporter = PromMetricsExporter(lambda: store)
 prom_metrics_scheduler = PromMetricsScheduler(prom_metrics_exporter)
-prom_http_server = PrometheusHttpServer(prom_metrics_exporter)
+prom_metrics_server = PromMetricsServer(prom_metrics_exporter)
 
 def start_threads():
-    prom_http_server.start()
+    prom_metrics_server.start()
     prom_metrics_scheduler.start()
     metrics_collector.start()
     settings_selector.start()
@@ -44,7 +44,7 @@ def stop_threads():
     settings_selector.stop()
     metrics_collector.stop()
     prom_metrics_scheduler.stop()
-    prom_http_server.stop()
+    prom_metrics_server.stop()
 
 app = FastAPI(
     on_startup=[start_threads],

@@ -7,7 +7,7 @@ from wsgiref.simple_server import make_server
 
 logger = logging.getLogger(__name__)
 
-class PrometheusHttpServer:
+class PromMetricsServer:
     def __init__(self, exporter, prom_port=9100, prom_host=''):
         """
         state_provider: Callable trả về RealtimeState dict
