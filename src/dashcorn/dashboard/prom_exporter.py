@@ -158,14 +158,14 @@ class PrometheusExporter:
                 worker_count[agent_id] += 1
 
             if "start_time" in master:
-                master_pid = str(master.get("pid", "master"))
+                pid = str(master.get("pid", "master"))
                 uptime = max(0, now - master["start_time"])
                 g5 = GaugeMetricFamily(
                     "uvicorn_master_uptime_seconds",
                     "Uptime of master process",
-                    labels=["agent_id", "master_pid"]
+                    labels=["agent_id", "pid"]
                 )
-                g5.add_metric([agent_id, master_pid], uptime)
+                g5.add_metric([agent_id, pid], uptime)
                 yield g5
 
         for agent_id in cpu_total:
