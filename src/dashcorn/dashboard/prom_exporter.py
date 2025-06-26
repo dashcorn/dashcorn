@@ -1,4 +1,7 @@
 import time
+import threading
+import logging
+
 from collections import defaultdict
 from prometheus_client.core import (
     GaugeMetricFamily,
@@ -6,8 +9,10 @@ from prometheus_client.core import (
     HistogramMetricFamily,
 )
 
+logger = logging.getLogger(__name__)
+
 class PrometheusExporter:
-    def __init__(self, state_provider):
+    def __init__(self, state_provider, enable_logging: bool = False):
         """
         state_provider: Callable không đối số, trả về dict RealtimeState.
         Cấu trúc gồm:
@@ -15,15 +20,97 @@ class PrometheusExporter:
             - 'server': dict agent_id -> {master, workers}
         """
         self._state_provider = state_provider
+        self._enable_logging = enable_logging
 
-    def collect(self):
+        self._accum_total = defaultdict(int)
+        self._accum_by_worker = defaultdict(int)
+        self._accum_duration_sum = defaultdict(float)
+        self._accum_duration_count = defaultdict(int)
+        self.in_progress = defaultdict(int)
+        self._lock = threading.Lock()
+
+    def aggregate_http_events(self):
         state = self._state_provider()
         now = time.time()
+
+        with self._lock:
+            self.in_progress = defaultdict(int)
+
+        for req in state.get_http_events(cleancut=True):
+            agent_id = req.get("agent_id", None)
+            if agent_id is None:
+                logger.warning(f"'agent_id' not found in http_event: {req}")
+                continue
+
+            method = req["method"]
+            path = req["path"]
+            status = str(req["status"])
+            duration = req["duration"]
+            pid = str(req["pid"])
+
+            with self._lock:
+                self._accum_total[(agent_id, method, path, status)] += 1
+                self._accum_by_worker[(agent_id, pid)] += 1
+                self._accum_duration_sum[(agent_id, method, path)] += duration
+                self._accum_duration_count[(agent_id, method, path)] += 1
+                if now - req["time"] < 4:
+                    self.in_progress[(agent_id, method, path)] += 1
+
+    def collect(self):
+        # ============ Request metrics ============
+        req_total = CounterMetricFamily(
+            "uvicorn_requests_total",
+            "Total number of HTTP requests",
+            labels=["agent_id", "method", "path", "status"],
+        )
+        req_by_worker = CounterMetricFamily(
+            "uvicorn_requests_by_worker_total",
+            "Total HTTP requests per worker",
+            labels=["agent_id", "pid"],
+        )
+        req_duration = HistogramMetricFamily(
+            "uvicorn_requests_duration_seconds",
+            "Request duration (seconds)",
+            labels=["agent_id", "method", "path"],
+        )
+        req_in_progress = GaugeMetricFamily(
+            "uvicorn_requests_in_progress",
+            "Number of in-progress HTTP requests",
+            labels=["agent_id", "method", "path"],
+        )
+
+        for (agent_id, method, path, status), value in self._accum_total.items():
+            req_total.add_metric([agent_id, method, path, status], value)
+
+        for (agent_id, pid), value in self._accum_by_worker.items():
+            req_by_worker.add_metric([agent_id, pid], value)
+
+        for (agent_id, method, path), count in self._accum_duration_count.items():
+            req_duration.add_sample(
+                "uvicorn_requests_duration_seconds_sum",
+                value=self._accum_duration_sum[(agent_id, method, path)],
+                labels={"agent_id": agent_id, "method": method, "path": path},
+            )
+            req_duration.add_sample(
+                "uvicorn_requests_duration_seconds_count",
+                value=count,
+                labels={"agent_id": agent_id, "method": method, "path": path},
+            )
+
+        for (agent_id, method, path), value in self.in_progress.items():
+            req_in_progress.add_metric([agent_id, method, path], value)
+
+        yield req_total
+        yield req_duration
+        yield req_in_progress
+        yield req_by_worker
 
         # ============ Worker + Master metrics ============
         cpu_total = defaultdict(float)
         mem_total = defaultdict(float)
         worker_count = defaultdict(int)
+
+        state = self._state_provider()
 
         for agent_id, info in state.get_all_servers().items():
             workers = info.get("workers", {})
@@ -56,6 +143,7 @@ class PrometheusExporter:
                 g3.add_metric(labels, w.get("num_threads", 0))
                 yield g3
 
+                now = time.time()
                 uptime = max(0, now - w.get("start_time", now))
                 g4 = GaugeMetricFamily(
                     "uvicorn_worker_uptime_seconds",

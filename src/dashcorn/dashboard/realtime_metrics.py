@@ -1,4 +1,5 @@
 import logging
+import threading
 
 from typing import Any, Dict, List, Literal, Optional
 
@@ -20,6 +21,7 @@ class RealtimeState:
             logging_enabled: bool = False):
         self._http_event_ttl = http_event_ttl
         self._http_events_maxlen = http_events_maxlen
+        self._http_events_lock = threading.Lock()
         self._http_events: ExpiringDeque[dict[str, Any]] = ExpiringDeque(
                 ttl=self._http_event_ttl,
                 maxlen=self._http_events_maxlen)
@@ -27,13 +29,18 @@ class RealtimeState:
         self._master_ttl = master_ttl
         self._worker_ttl = worker_ttl
         self._workers_maxlen = workers_maxlen
+        self._workers_lock = threading.Lock()
         self._logging_enabled = logging_enabled
 
     def update(self, kind: Kind, data: dict[str, Any]) -> None:
         if kind == "http":
-            self._http_events.append(data)
-            if self._logging_enabled:
-                logger.debug(f"HTTP event has been appended. Total = {len(self._http_events)}")
+            with self._http_events_lock:
+                if self._logging_enabled:
+                    _len1 = len(self._http_events)
+                self._http_events.append(data)
+                if self._logging_enabled:
+                    _len2 = len(self._http_events)
+                    logger.debug(f"HTTP event has been appended. Total {_len1} -> {_len2}")
 
         elif kind == "server":
             agent_id = data.get("agent_id")
@@ -87,8 +94,12 @@ class RealtimeState:
 
         return leaders
 
-    def get_http_events(self) -> list[dict[str, Any]]:
-        return list(self._http_events)
+    def get_http_events(self, cleancut: bool=False) -> list[dict[str, Any]]:
+        with self._http_events_lock:
+            http_snapshot = list(self._http_events)
+            if cleancut:
+                self._http_events.clear()
+            return http_snapshot
 
     def get_server_workers(self, agent_id: str) -> dict[str, dict[str, Any]]:
         return self._extract_server_state(self._server_state.get(agent_id))

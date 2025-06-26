@@ -5,17 +5,15 @@ import logging
 from prometheus_client import REGISTRY, make_wsgi_app
 from wsgiref.simple_server import make_server
 
-from dashcorn.dashboard.prom_exporter import PrometheusExporter
-
 logger = logging.getLogger(__name__)
 
 class PrometheusHttpServer:
-    def __init__(self, state_provider, prom_port=9100, prom_host=''):
+    def __init__(self, exporter, prom_port=9100, prom_host=''):
         """
         state_provider: Callable trả về RealtimeState dict
         prom_port: cổng exporter Prometheus
         """
-        self._state_provider = state_provider
+        self._exporter = exporter
         self._prom_host = prom_host
         self._prom_port = prom_port
         self._server = None
@@ -53,8 +51,7 @@ class PrometheusHttpServer:
 
     def _run_prometheus_exporter(self):
         try:
-            exporter = PrometheusExporter(self._state_provider)
-            REGISTRY.register(exporter)
+            REGISTRY.register(self._exporter)
             app = make_wsgi_app(registry=REGISTRY)
             self._server = make_server(self._prom_host, self._prom_port, app)
             self._server.serve_forever()
