@@ -18,10 +18,12 @@ import os
 import psutil
 import logging
 import time
+import uuid
 
 from collections.abc import Iterable
 from typing import Awaitable, Callable, Optional
 
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -33,6 +35,8 @@ from .worker_sender import MetricsSender
 from .settings_store import SettingsStore
 from .settings_listener import SettingsListener
 from .worker_reporter import WorkerReporter
+
+X_REQUEST_ID = "X-Request-Id"
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +56,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     """
 
     def __init__(self, app, *args, config: Optional[AgentConfig]=None,
+            enable_request_id: bool = True,
             normalize_path: Optional[Callable]=None,
             **kwargs):
         """
@@ -70,6 +75,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         super().__init__(app, *args, **kwargs)
 
         self._config = config or AgentConfig()
+        self._enable_request_id = enable_request_id
         self._normalize_path = normalize_path
 
         self._pid = os.getpid()
@@ -108,12 +114,28 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             Response: The HTTP response returned by the next handler.
         """
         start_time = time.perf_counter()
+        extras = dict()
+
+        if self._enable_request_id:
+            mutable_headers = MutableHeaders(scope=request.scope)
+
+            if "x-request-id" not in mutable_headers:
+                mutable_headers["x-request-id"] = str(uuid.uuid4())
+
+            request_id = mutable_headers["x-request-id"]
+            request.scope[X_REQUEST_ID] = request_id
+            extras["request_id"] = request_id
+
         try:
             response = await call_next(request)
         except Exception as exc:
             response = Response("Internal Server Error", status_code=500)
             raise exc
         finally:
+            if self._enable_request_id:
+                if X_REQUEST_ID not in response.headers:
+                    response.headers[X_REQUEST_ID] = request_id
+
             duration = time.perf_counter() - start_time
             self._metrics_sender.send({
                 "type": "http",
@@ -125,6 +147,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 "pid": self._pid,
                 "parent_pid": self._parent_pid,
                 "agent_id": self._agent_id,
+                **extras,
             })
 
         return response
