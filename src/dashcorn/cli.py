@@ -120,6 +120,31 @@ def save_template_file():
     typer.echo(f"✅ Template saved to: {config_file}")
 
 
+@scmd_inject.command("edit-template-file")
+def edit_template_file():
+    """
+    Open the hook-config.yml template in $EDITOR for manual editing.
+    If the file does not exist, it will be created using the default template.
+    """
+    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if not config_file.exists():
+        with config_file.open("w", encoding="utf-8") as f:
+            yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
+        typer.echo(f"📄 Created default config at {config_file}")
+
+    editor = os.getenv("EDITOR")
+    if not editor:
+        editor = "notepad" if os.name == "nt" else "nano"
+
+    try:
+        typer.echo(f"📝 Opening {config_file} with editor: {editor}")
+        subprocess.run([editor, str(config_file)])
+    except FileNotFoundError:
+        typer.echo(f"❌ Editor '{editor}' not found. Please set your $EDITOR environment variable.", err=True)
+        raise typer.Exit(1)
+
 #--------------------------------------------------------------------------------------------------
 
 @app.command()
