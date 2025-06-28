@@ -2,10 +2,14 @@ import typer
 import subprocess
 import httpx
 import os
+import yaml
+
 from datetime import datetime
 from pathlib import Path
 
 app = typer.Typer(help="Dashcorn – A real-time dashboard for FastAPI/Uvicorn applications")
+
+#--------------------------------------------------------------------------------------------------
 
 @app.command()
 def dashboard(
@@ -22,6 +26,99 @@ def status():
     typer.echo("📊 Dashcorn status (demo):")
     typer.echo(" - Dashboard running: Unknown (check port 5555)")
     typer.echo(" - Agent data sent: Use `/metrics` endpoint to verify")
+
+#--------------------------------------------------------------------------------------------------
+
+from dashcorn.command.code_hook_injector import (
+    DEFAULT_INJECT_CONFIG,
+    inject_middlewares_to_source_file,
+    inject_lifecycle_to_source_file
+)
+
+def _load_config_from_template_file(from_template_file: bool):
+    if from_template_file:
+        config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
+        if not config_file.exists():
+            raise FileNotFoundError("Template file not found. Run: dashcorn inject save-template-file")
+        with config_file.open("r", encoding="utf-8") as f:
+            inject_config = yaml.safe_load(f)
+    else:
+        inject_config = DEFAULT_INJECT_CONFIG
+    return inject_config
+
+
+scmd_inject = typer.Typer()
+app.add_typer(scmd_inject, name="inject", help="(Optional) Automatically insert Dashcorn middleware into app.py")
+
+
+@scmd_inject.command("all")
+def inject_all_cmd(
+    file: Path,
+    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-config.yml"),
+    backup: bool = typer.Option(True, help="Create a .bak backup before modifying the source file.")
+):
+    """
+    Inject both middleware and lifecycle hooks into a FastAPI source file.
+    """
+    try:
+        inject_config = _load_config_from_template_file(from_template_file)
+
+        inject_middlewares_to_source_file(str(file), config=inject_config, backup=backup)
+        inject_lifecycle_to_source_file(str(file), config=inject_config, backup=False)
+
+        typer.echo(f"✅ Middleware and lifecycle hooks injected into {file}")
+    except Exception as e:
+        typer.echo(f"❌ Injection failed: {e}", err=True)
+
+
+@scmd_inject.command("middleware")
+def inject_middleware_cmd(
+    file: Path,
+    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-config.yml"),
+    backup: bool = typer.Option(True, help="Create a .bak backup before modifying the source file."),
+):
+    """
+    Inject middleware and import statements into a FastAPI source file.
+    """
+    try:
+        inject_config = _load_config_from_template_file(from_template_file)
+        inject_middlewares_to_source_file(str(file), config=inject_config, backup=backup)
+        typer.echo(f"✅ Middleware injected into {file}")
+    except Exception as e:
+        typer.echo(f"❌ Error: {e}", err=True)
+
+
+@scmd_inject.command("lifecycle")
+def inject_lifecycle_cmd(
+    file: Path,
+    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-config.yml"),
+    backup: bool = typer.Option(True, help="Create a .bak backup before modifying the source file."),
+):
+    """
+    Inject startup/shutdown lifecycle hooks into a FastAPI source file.
+    """
+    try:
+        inject_config = _load_config_from_template_file(from_template_file)
+        inject_lifecycle_to_source_file(str(file), config=inject_config, backup=backup)
+        typer.echo(f"✅ Lifecycle hooks injected into {file}")
+    except Exception as e:
+        typer.echo(f"❌ Error: {e}", err=True)
+
+
+@scmd_inject.command("save-template-file")
+def save_template_file():
+    """
+    Save the DEFAULT_INJECT_CONFIG to ~/.config/dashcorn/hook-config.yml
+    """
+    config_dir = Path.home() / ".config" / "dashcorn"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    config_file = config_dir / "hook-config.yml"
+    with config_file.open("w", encoding="utf-8") as f:
+        yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
+
+    typer.echo(f"✅ Template saved to: {config_file}")
+
 
 @app.command()
 def install():
