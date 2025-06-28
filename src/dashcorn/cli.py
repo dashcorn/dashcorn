@@ -145,6 +145,29 @@ def edit_template_file():
         typer.echo(f"❌ Editor '{editor}' not found. Please set your $EDITOR environment variable.", err=True)
         raise typer.Exit(1)
 
+
+@scmd_inject.command("view-template-file")
+def view_template_file():
+    """
+    Print the contents of the hook-config.yml template to the terminal.
+    If the file does not exist, it will be created using the default template.
+    """
+    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if not config_file.exists():
+        with config_file.open("w", encoding="utf-8") as f:
+            yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
+        typer.echo(f"📄 Created default config at {config_file}")
+
+    with config_file.open("r", encoding="utf-8") as f:
+        content = f.read()
+
+    typer.echo(f"📂 Config path: {config_file}")
+    typer.echo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    typer.echo(content.strip())
+    typer.echo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
 #--------------------------------------------------------------------------------------------------
 
 @app.command()
