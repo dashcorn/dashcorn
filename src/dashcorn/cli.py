@@ -120,21 +120,7 @@ def save_template_file():
     typer.echo(f"✅ Template saved to: {config_file}")
 
 
-@app.command()
-def install():
-    """(Optional) Automatically insert Dashcorn middleware into app.py"""
-    app_file = Path("app.py")
-    if app_file.exists():
-        content = app_file.read_text()
-        if "from dashcorn.agent.middleware" in content:
-            typer.echo("✅ Middleware already added.")
-        else:
-            insert = "from dashcorn.agent.middleware import MetricsMiddleware\napp.add_middleware(MetricsMiddleware)\n"
-            content = content.replace("app = FastAPI()", "app = FastAPI()\n" + insert)
-            app_file.write_text(content)
-            typer.echo("✅ MetricsMiddleware successfully added to app.py.")
-    else:
-        typer.echo("⚠️ Could not find app.py to insert middleware.")
+#--------------------------------------------------------------------------------------------------
 
 @app.command()
 def show(kind: str = typer.Argument(..., help="master or workers")):
