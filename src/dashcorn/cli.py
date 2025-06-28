@@ -36,6 +36,8 @@ from dashcorn.command.code_hook_injector import (
     inject_lifecycle_to_source_file
 )
 
+from dashcorn.command import hook_template_config as hooks
+
 def _load_config_from_template_file(from_template_file: bool):
     if from_template_file:
         config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
@@ -112,17 +114,13 @@ def init_template_file():
     Initialize hook-config.yml with the default template.
     Will not overwrite if the file already exists.
     """
-    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
-    config_file.parent.mkdir(parents=True, exist_ok=True)
+    created = hooks.init_hook_template()
+    config_path = hooks.get_hook_config_path()
 
-    if config_file.exists():
-        typer.echo(f"⚠️ Config already exists: {config_file}")
-        return
-
-    with config_file.open("w", encoding="utf-8") as f:
-        yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
-
-    typer.echo(f"✅ Template initialized at: {config_file}")
+    if created:
+        typer.echo(f"✅ Template initialized at: {config_path}")
+    else:
+        typer.echo(f"⚠️ Config already exists at: {config_path}")
 
 
 @scmd_inject.command("reset-template-file")
@@ -131,13 +129,8 @@ def reset_template_file():
     Overwrite hook-config.yml with the default template.
     WARNING: This will erase existing customizations.
     """
-    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
-    config_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with config_file.open("w", encoding="utf-8") as f:
-        yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
-
-    typer.echo(f"♻️ Template has been reset to default at: {config_file}")
+    hooks.reset_hook_template()
+    typer.echo(f"♻️ Template has been reset at: {hooks.get_hook_config_path()}")
 
 
 @scmd_inject.command("edit-template-file")
@@ -146,21 +139,15 @@ def edit_template_file():
     Open the hook-config.yml template in $EDITOR for manual editing.
     If the file does not exist, it will be created using the default template.
     """
-    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
-    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_path = hooks.get_hook_config_path()
+    created = hooks.init_hook_template()
+    if created:
+        typer.echo(f"📄 Created new config at {config_path}")
 
-    if not config_file.exists():
-        with config_file.open("w", encoding="utf-8") as f:
-            yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
-        typer.echo(f"📄 Created default config at {config_file}")
-
-    editor = os.getenv("EDITOR")
-    if not editor:
-        editor = "notepad" if os.name == "nt" else "nano"
-
+    editor = os.getenv("EDITOR") or ("notepad" if os.name == "nt" else "nano")
     try:
-        typer.echo(f"📝 Opening {config_file} with editor: {editor}")
-        subprocess.run([editor, str(config_file)])
+        typer.echo(f"📝 Opening {config_path} with editor: {editor}")
+        subprocess.run([editor, str(config_path)])
     except FileNotFoundError:
         typer.echo(f"❌ Editor '{editor}' not found. Please set your $EDITOR environment variable.", err=True)
         raise typer.Exit(1)
@@ -172,18 +159,8 @@ def view_template_file():
     Print the contents of the hook-config.yml template to the terminal.
     If the file does not exist, it will be created using the default template.
     """
-    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
-    config_file.parent.mkdir(parents=True, exist_ok=True)
-
-    if not config_file.exists():
-        with config_file.open("w", encoding="utf-8") as f:
-            yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
-        typer.echo(f"📄 Created default config at {config_file}")
-
-    with config_file.open("r", encoding="utf-8") as f:
-        content = f.read()
-
-    typer.echo(f"📂 Config path: {config_file}")
+    content = hooks.read_hook_template()
+    typer.echo(f"📂 Config path: {hooks.get_hook_config_path()}")
     typer.echo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     typer.echo(content.strip())
     typer.echo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -195,34 +172,10 @@ def diff_template_file():
     Show the difference between the current hook-config.yml file
     and the DEFAULT_INJECT_CONFIG.
     """
-    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
-    config_file.parent.mkdir(parents=True, exist_ok=True)
-
-    if not config_file.exists():
-        with config_file.open("w", encoding="utf-8") as f:
-            yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
-        typer.echo(f"📄 Created default config at {config_file}")
-
-    # Load actual YAML content from file
-    with config_file.open("r", encoding="utf-8") as f:
-        actual_yaml = f.read()
-
-    # Convert DEFAULT_INJECT_CONFIG to YAML string
-    default_yaml = yaml.dump(DEFAULT_INJECT_CONFIG, allow_unicode=True)
-
-    # Compare line-by-line
-    diff = difflib.unified_diff(
-        default_yaml.splitlines(),
-        actual_yaml.splitlines(),
-        fromfile="DEFAULT_INJECT_CONFIG",
-        tofile=str(config_file),
-        lineterm=""
-    )
-
-    diff_output = list(diff)
-    if diff_output:
+    diff_lines = hooks.diff_hook_template()
+    if diff_lines:
         typer.echo("🔍 Differences between current config and default:")
-        typer.echo("\n".join(diff_output))
+        typer.echo("\n".join(diff_lines))
     else:
         typer.echo("✅ Your hook-config.yml is identical to the default.")
 
