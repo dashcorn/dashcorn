@@ -106,19 +106,38 @@ def inject_lifecycle_cmd(
         typer.echo(f"❌ Error: {e}", err=True)
 
 
-@scmd_inject.command("save-template-file")
-def save_template_file():
+@scmd_inject.command("init-template-file")
+def init_template_file():
     """
-    Save the DEFAULT_INJECT_CONFIG to ~/.config/dashcorn/hook-config.yml
+    Initialize hook-config.yml with the default template.
+    Will not overwrite if the file already exists.
     """
-    config_dir = Path.home() / ".config" / "dashcorn"
-    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
 
-    config_file = config_dir / "hook-config.yml"
+    if config_file.exists():
+        typer.echo(f"⚠️ Config already exists: {config_file}")
+        return
+
     with config_file.open("w", encoding="utf-8") as f:
         yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
 
-    typer.echo(f"✅ Template saved to: {config_file}")
+    typer.echo(f"✅ Template initialized at: {config_file}")
+
+
+@scmd_inject.command("reset-template-file")
+def reset_template_file():
+    """
+    Overwrite hook-config.yml with the default template.
+    WARNING: This will erase existing customizations.
+    """
+    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with config_file.open("w", encoding="utf-8") as f:
+        yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
+
+    typer.echo(f"♻️ Template has been reset to default at: {config_file}")
 
 
 @scmd_inject.command("edit-template-file")
