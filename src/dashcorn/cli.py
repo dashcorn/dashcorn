@@ -1,3 +1,4 @@
+import difflib
 import typer
 import subprocess
 import httpx
@@ -167,6 +168,44 @@ def view_template_file():
     typer.echo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     typer.echo(content.strip())
     typer.echo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+
+@scmd_inject.command("diff-template-file")
+def diff_template_file():
+    """
+    Show the difference between the current hook-config.yml file
+    and the DEFAULT_INJECT_CONFIG.
+    """
+    config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if not config_file.exists():
+        with config_file.open("w", encoding="utf-8") as f:
+            yaml.dump(DEFAULT_INJECT_CONFIG, f, allow_unicode=True)
+        typer.echo(f"📄 Created default config at {config_file}")
+
+    # Load actual YAML content from file
+    with config_file.open("r", encoding="utf-8") as f:
+        actual_yaml = f.read()
+
+    # Convert DEFAULT_INJECT_CONFIG to YAML string
+    default_yaml = yaml.dump(DEFAULT_INJECT_CONFIG, allow_unicode=True)
+
+    # Compare line-by-line
+    diff = difflib.unified_diff(
+        default_yaml.splitlines(),
+        actual_yaml.splitlines(),
+        fromfile="DEFAULT_INJECT_CONFIG",
+        tofile=str(config_file),
+        lineterm=""
+    )
+
+    diff_output = list(diff)
+    if diff_output:
+        typer.echo("🔍 Differences between current config and default:")
+        typer.echo("\n".join(diff_output))
+    else:
+        typer.echo("✅ Your hook-config.yml is identical to the default.")
 
 #--------------------------------------------------------------------------------------------------
 
