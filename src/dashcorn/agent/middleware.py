@@ -152,7 +152,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         return response
 
-def get_route_path(request, normalize: Optional[Callable]=None, safe_check: bool = True):
+def get_route_path(request: Request, normalize: Optional[Callable]=None, safe_check: bool = True):
     if not safe_check:
         return request.scope.get("route").path if "route" in request.scope else request.url.path
 

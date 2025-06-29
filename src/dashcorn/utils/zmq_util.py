@@ -1,5 +1,4 @@
 import os
-import zmq
 import errno
 import stat
 
