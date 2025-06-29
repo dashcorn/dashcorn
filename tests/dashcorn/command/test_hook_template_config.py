@@ -1,5 +1,6 @@
 import yaml
 import pytest
+
 from pathlib import Path
 
 from dashcorn.command import hook_template_config as hooks

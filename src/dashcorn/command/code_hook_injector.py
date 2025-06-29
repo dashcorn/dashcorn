@@ -10,14 +10,14 @@ def insert_middleware_and_imports(
     middleware_lines: list[str],
 ) -> str:
     """
-    Tìm đối tượng FastAPI đầu tiên và chèn các dòng middleware phía sau nó.
-    Đồng thời chèn các dòng import nếu chưa có.
+    Find the first FastAPI() object and insert middleware lines after it.
+    Also insert import lines if they don't already exist.
     """
     tree = ast.parse(source_code)
     lines = source_code.splitlines()
     new_lines = lines[:]
 
-    # ===== 1. Chèn middleware sau FastAPI() =====
+    # ===== 1. Insert middleware after FastAPI() object =====
     inserted = False
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
@@ -35,9 +35,9 @@ def insert_middleware_and_imports(
                 break
 
     if not inserted:
-        raise ValueError("Không tìm thấy đối tượng FastAPI trong mã nguồn.")
+        raise ValueError("Could not find FastAPI instance in the source code.")
 
-    # ===== 2. Chèn import nếu chưa tồn tại =====
+    # ===== 2. Insert missing import statements =====
     existing_source = "\n".join(lines)
     existing_imports = set(re.findall(r'^\s*(?:from|import)\s+[^\n]+', existing_source, re.MULTILINE))
 
@@ -47,7 +47,7 @@ def insert_middleware_and_imports(
             to_insert.append(imp)
 
     if to_insert:
-        # tìm dòng import cuối cùng
+        # Find the last import line
         last_import_idx = 0
         for idx, line in enumerate(lines):
             if re.match(r'^\s*(import|from)\s+', line):
@@ -69,29 +69,29 @@ def inject_middlewares_to_source_file(
     backup: bool = True
 ) -> None:
     """
-    Đọc tệp nguồn Python, chèn middleware & import, sau đó ghi đè nội dung.
-    Nếu backup=True, sẽ lưu một bản sao tại <file_path>.bak.
+    Read a Python source file, inject middleware & imports, then overwrite the file.
+    If backup=True, a copy will be saved at <file_path>.bak.
     """
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Tệp không tồn tại: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}")
     
     with open(file_path, "r", encoding="utf-8") as f:
         source_code = f.read()
 
-    # Gọi hàm xử lý nội dung
+    # Process the content
     updated_code = insert_middleware_and_imports(
         source_code=source_code,
         import_statements=import_statements or config.get("middleware", {}).get("imports", []),
         middleware_lines=middleware_lines or config.get("middleware", {}).get("lines", []),
     )
 
-    # Tạo bản sao nếu cần
+    # Create a backup if needed
     if backup:
         backup_path = file_path + ".bak"
         with open(backup_path, "w", encoding="utf-8") as f:
             f.write(source_code)
 
-    # Ghi đè nội dung mới
+    # Overwrite with updated content
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(updated_code)
 
