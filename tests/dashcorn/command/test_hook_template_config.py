@@ -13,7 +13,7 @@ def mock_config_dir(tmp_path, monkeypatch):
     Redirect ~/.config/dashcorn to a temporary path for isolated testing.
     """
     fake_config_path = tmp_path / "dashcorn"
-    monkeypatch.setattr(hooks, "CONFIG_PATH", fake_config_path / "hook-config.yml")
+    monkeypatch.setattr(hooks, "CONFIG_PATH", fake_config_path / "hook-template.yaml")
     yield
 
 

@@ -20,7 +20,7 @@ console = Console()
 
 def _load_config_from_template_file(from_template_file: bool):
     if from_template_file:
-        config_file = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
+        config_file = Path.home() / ".config" / "dashcorn" / "hook-template.yaml"
         if not config_file.exists():
             raise FileNotFoundError("Template file not found. Run: dashcorn inject save-template-file")
         with config_file.open("r", encoding="utf-8") as f:
@@ -34,7 +34,7 @@ sub_cmd = typer.Typer()
 @sub_cmd.command("all")
 def inject_all_cmd(
     file: Path,
-    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-config.yml"),
+    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-template.yaml"),
     backup: bool = typer.Option(True, help="Create a .bak backup before modifying the source file.")
 ):
     """
@@ -54,7 +54,7 @@ def inject_all_cmd(
 @sub_cmd.command("middleware")
 def inject_middleware_cmd(
     file: Path,
-    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-config.yml"),
+    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-template.yaml"),
     backup: bool = typer.Option(True, help="Create a .bak backup before modifying the source file."),
 ):
     """
@@ -71,7 +71,7 @@ def inject_middleware_cmd(
 @sub_cmd.command("lifecycle")
 def inject_lifecycle_cmd(
     file: Path,
-    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-config.yml"),
+    from_template_file: bool = typer.Option(False, help="Use YAML template from ~/.config/dashcorn/hook-template.yaml"),
     backup: bool = typer.Option(True, help="Create a .bak backup before modifying the source file."),
 ):
     """
@@ -88,7 +88,7 @@ def inject_lifecycle_cmd(
 @sub_cmd.command("init-template-file")
 def init_template_file():
     """
-    Initialize hook-config.yml with the default template.
+    Initialize hook-template.yaml with the default template.
     Will not overwrite if the file already exists.
     """
     created = hooks.init_hook_template()
@@ -103,7 +103,7 @@ def init_template_file():
 @sub_cmd.command("reset-template-file")
 def reset_template_file():
     """
-    Overwrite hook-config.yml with the default template.
+    Overwrite hook-template.yaml with the default template.
     WARNING: This will erase existing customizations.
     """
     hooks.reset_hook_template()
@@ -113,7 +113,7 @@ def reset_template_file():
 @sub_cmd.command("edit-template-file")
 def edit_template_file():
     """
-    Open the hook-config.yml template in $EDITOR for manual editing.
+    Open the hook-template.yaml template in $EDITOR for manual editing.
     If the file does not exist, it will be created using the default template.
     """
     config_path = hooks.get_hook_config_path()
@@ -133,7 +133,7 @@ def edit_template_file():
 @sub_cmd.command("view-template-file")
 def view_template_file():
     """
-    Print the contents of the hook-config.yml template to the terminal.
+    Print the contents of the hook-template.yaml template to the terminal.
     If the file does not exist, it will be created using the default template.
     """
     content = hooks.read_hook_template()
@@ -146,11 +146,11 @@ def view_template_file():
 @sub_cmd.command("diff-template-file")
 def diff_template_file(plain: bool = typer.Option(False, "--plain", "--no-color", help="Output plain text without colors.")):
     """
-    Show the difference between hook-config.yml and the default template (with optional colors).
+    Show the difference between hook-template.yaml and the default template (with optional colors).
     """
     diff_lines = hooks.diff_hook_template()
     if not diff_lines:
-        msg = "✅ Your hook-config.yml is identical to the default."
+        msg = "✅ Your hook-template.yaml is identical to the default."
         if plain:
             typer.echo(msg)
         else:

@@ -4,7 +4,7 @@ import difflib
 
 from .code_hook_injector import DEFAULT_INJECT_CONFIG
 
-CONFIG_PATH = Path.home() / ".config" / "dashcorn" / "hook-config.yml"
+CONFIG_PATH = Path.home() / ".config" / "dashcorn" / "hook-template.yaml"
 
 
 def get_hook_config_path() -> Path:
@@ -14,7 +14,7 @@ def get_hook_config_path() -> Path:
 
 def init_hook_template() -> bool:
     """
-    Create hook-config.yml only if it does not exist.
+    Create hook-template.yaml only if it does not exist.
     Returns True if file was created, False if it already existed.
     """
     path = get_hook_config_path()
@@ -27,7 +27,7 @@ def init_hook_template() -> bool:
 
 def reset_hook_template():
     """
-    Overwrite hook-config.yml with the default config.
+    Overwrite hook-template.yaml with the default config.
     """
     path = get_hook_config_path()
     with path.open("w", encoding="utf-8") as f:
