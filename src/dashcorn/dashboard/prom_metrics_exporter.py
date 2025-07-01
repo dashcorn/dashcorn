@@ -2,6 +2,7 @@ import time
 import threading
 import logging
 
+from typing import Optional
 from collections import defaultdict
 from prometheus_client.core import (
     GaugeMetricFamily,
@@ -12,7 +13,25 @@ from prometheus_client.core import (
 logger = logging.getLogger(__name__)
 
 class PromMetricsExporter:
-    def __init__(self, state_provider, enable_logging: bool = False):
+    metric_requests_total = "uvicorn_requests_total"
+    metric_requests_by_worker_total = "uvicorn_requests_by_worker_total"
+    metric_requests_duration_seconds = "uvicorn_requests_duration_seconds"
+    metric_requests_in_progress = "uvicorn_requests_in_progress"
+    metric_requests_duration_seconds_sum = "uvicorn_requests_duration_seconds_sum"
+    metric_requests_duration_seconds_count = "uvicorn_requests_duration_seconds_count"
+    metric_worker_cpu_percent = "uvicorn_worker_cpu_percent"
+    metric_worker_memory_bytes = "uvicorn_worker_memory_bytes"
+    metric_worker_thread_count = "uvicorn_worker_thread_count"
+    metric_worker_uptime_seconds = "uvicorn_worker_uptime_seconds"
+    metric_master_uptime_seconds = "uvicorn_master_uptime_seconds"
+    metric_total_cpu_percent = "uvicorn_total_cpu_percent"
+    metric_total_memory_bytes = "uvicorn_total_memory_bytes"
+    metric_active_worker_count = "uvicorn_active_worker_count"
+
+    def __init__(self, state_provider,
+        metric_label_prefix: Optional[str] = None,
+        enable_logging: bool = False,
+    ):
         """
         state_provider: Callable không đối số, trả về dict RealtimeState.
         Cấu trúc gồm:
@@ -21,6 +40,22 @@ class PromMetricsExporter:
         """
         self._state_provider = state_provider
         self._enable_logging = enable_logging
+
+        if metric_label_prefix and isinstance(metric_label_prefix, str):
+            self.metric_requests_total = metric_label_prefix + "_requests_total"
+            self.metric_requests_by_worker_total = metric_label_prefix + "_requests_by_worker_total"
+            self.metric_requests_duration_seconds = metric_label_prefix + "_requests_duration_seconds"
+            self.metric_requests_in_progress = metric_label_prefix + "_requests_in_progress"
+            self.metric_requests_duration_seconds_sum = metric_label_prefix + "_requests_duration_seconds_sum"
+            self.metric_requests_duration_seconds_count = metric_label_prefix + "_requests_duration_seconds_count"
+            self.metric_worker_cpu_percent = metric_label_prefix + "_worker_cpu_percent"
+            self.metric_worker_memory_bytes = metric_label_prefix + "_worker_memory_bytes"
+            self.metric_worker_thread_count = metric_label_prefix + "_worker_thread_count"
+            self.metric_worker_uptime_seconds = metric_label_prefix + "_worker_uptime_seconds"
+            self.metric_master_uptime_seconds = metric_label_prefix + "_master_uptime_seconds"
+            self.metric_total_cpu_percent = metric_label_prefix + "_total_cpu_percent"
+            self.metric_total_memory_bytes = metric_label_prefix + "_total_memory_bytes"
+            self.metric_active_worker_count = metric_label_prefix + "_active_worker_count"
 
         self._accum_total = defaultdict(int)
         self._accum_by_worker = defaultdict(int)
@@ -57,24 +92,24 @@ class PromMetricsExporter:
                     self._accum_in_progress[(agent_id, method, path)] += 1
 
     def collect(self):
-        # ============ Request metrics ============
+        # Request metrics
         req_total = CounterMetricFamily(
-            "uvicorn_requests_total",
+            self.metric_requests_total,
             "Total number of HTTP requests",
             labels=["agent_id", "method", "path", "status"],
         )
         req_by_worker = CounterMetricFamily(
-            "uvicorn_requests_by_worker_total",
+            self.metric_requests_by_worker_total,
             "Total HTTP requests per worker",
             labels=["agent_id", "pid"],
         )
         req_duration = HistogramMetricFamily(
-            "uvicorn_requests_duration_seconds",
+            self.metric_requests_duration_seconds,
             "Request duration (seconds)",
             labels=["agent_id", "method", "path"],
         )
         req_in_progress = GaugeMetricFamily(
-            "uvicorn_requests_in_progress",
+            self.metric_requests_in_progress,
             "Number of in-progress HTTP requests",
             labels=["agent_id", "method", "path"],
         )
@@ -87,12 +122,12 @@ class PromMetricsExporter:
 
         for (agent_id, method, path), count in self._accum_duration_count.items():
             req_duration.add_sample(
-                "uvicorn_requests_duration_seconds_sum",
+                self.metric_requests_duration_seconds_sum,
                 value=self._accum_duration_sum[(agent_id, method, path)],
                 labels={"agent_id": agent_id, "method": method, "path": path},
             )
             req_duration.add_sample(
-                "uvicorn_requests_duration_seconds_count",
+                self.metric_requests_duration_seconds_count,
                 value=count,
                 labels={"agent_id": agent_id, "method": method, "path": path},
             )
@@ -105,7 +140,7 @@ class PromMetricsExporter:
         yield req_in_progress
         yield req_by_worker
 
-        # ============ Worker + Master metrics ============
+        # Worker + Master metrics
         cpu_total = defaultdict(float)
         mem_total = defaultdict(float)
         worker_count = defaultdict(int)
@@ -120,7 +155,7 @@ class PromMetricsExporter:
                 labels = [agent_id, pid_str]
 
                 g = GaugeMetricFamily(
-                    "uvicorn_worker_cpu_percent",
+                    self.metric_worker_cpu_percent,
                     "CPU usage (%) per worker",
                     labels=["agent_id", "pid"]
                 )
@@ -128,7 +163,7 @@ class PromMetricsExporter:
                 yield g
 
                 g2 =GaugeMetricFamily(
-                    "uvicorn_worker_memory_bytes",
+                    self.metric_worker_memory_bytes,
                     "Memory usage in bytes",
                     labels=["agent_id", "pid"]
                 )
@@ -136,7 +171,7 @@ class PromMetricsExporter:
                 yield g2
 
                 g3 = GaugeMetricFamily(
-                    "uvicorn_worker_thread_count",
+                    self.metric_worker_thread_count,
                     "Thread count per worker",
                     labels=["agent_id", "pid"]
                 )
@@ -146,7 +181,7 @@ class PromMetricsExporter:
                 now = time.time()
                 uptime = max(0, now - w.get("start_time", now))
                 g4 = GaugeMetricFamily(
-                    "uvicorn_worker_uptime_seconds",
+                    self.metric_worker_uptime_seconds,
                     "Worker uptime in seconds",
                     labels=["agent_id", "pid"]
                 )
@@ -161,7 +196,7 @@ class PromMetricsExporter:
                 pid = str(master.get("pid", "master"))
                 uptime = max(0, now - master["start_time"])
                 g5 = GaugeMetricFamily(
-                    "uvicorn_master_uptime_seconds",
+                    self.metric_master_uptime_seconds,
                     "Uptime of master process",
                     labels=["agent_id", "pid"]
                 )
@@ -170,21 +205,21 @@ class PromMetricsExporter:
 
         for agent_id in cpu_total:
             g6 = GaugeMetricFamily(
-                "uvicorn_total_cpu_percent",
+                self.metric_total_cpu_percent,
                 "Total CPU usage (%) per agent",
                 labels=["agent_id"])
             g6.add_metric([agent_id], cpu_total[agent_id])
             yield g6
 
             g7 = GaugeMetricFamily(
-                "uvicorn_total_memory_bytes",
+                self.metric_total_memory_bytes,
                 "Total memory usage (bytes) per agent",
                 labels=["agent_id"])
             g7.add_metric([agent_id], mem_total[agent_id])
             yield g7
 
             g8 = GaugeMetricFamily(
-                "uvicorn_active_worker_count",
+                self.metric_active_worker_count,
                 "Number of active workers",
                 labels=["agent_id"])
             g8.add_metric([agent_id], worker_count[agent_id])
