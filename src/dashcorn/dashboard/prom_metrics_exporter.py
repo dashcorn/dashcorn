@@ -77,18 +77,22 @@ class PromMetricsExporter:
                 logger.warning(f"'agent_id' not found in http_event: {req}")
                 continue
 
-            method = req["method"]
-            path = req["path"]
-            status = str(req["status"])
-            duration = req["duration"]
-            pid = str(req["pid"])
+            method = req.get("method", "unknown")
+            path = req.get("path", "unknown")
+            status = str(req.get("status", "000"))
+            duration = req.get("duration", 0.0)
+            pid = str(req.get("pid", "0"))
+
+            if "method" not in req or "path" not in req or "status" not in req:
+                logger.warning(f"Incomplete HTTP event fields: {req}")
 
             with self._lock:
                 self._accum_total[(agent_id, method, path, status)] += 1
                 self._accum_by_worker[(agent_id, pid)] += 1
                 self._accum_duration_sum[(agent_id, method, path)] += duration
                 self._accum_duration_count[(agent_id, method, path)] += 1
-                if now - req["time"] < 4:
+                event_time = req.get("time")
+                if event_time and now - event_time < 4:
                     self._accum_in_progress[(agent_id, method, path)] += 1
 
     def collect(self):
@@ -194,7 +198,7 @@ class PromMetricsExporter:
 
             if "start_time" in master:
                 pid = str(master.get("pid", "master"))
-                uptime = max(0, now - master["start_time"])
+                uptime = max(0, now - master.get("start_time", now))
                 g5 = GaugeMetricFamily(
                     self.metric_master_uptime_seconds,
                     "Uptime of master process",

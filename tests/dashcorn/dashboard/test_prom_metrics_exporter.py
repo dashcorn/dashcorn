@@ -1,5 +1,7 @@
-import pytest
 import time
+import pytest
+
+from unittest.mock import MagicMock, patch
 
 from dashcorn.dashboard.prom_metrics_exporter import PromMetricsExporter
 
@@ -159,3 +161,53 @@ def test_prom_exporter_with_prefix():
     assert count_sample is not None
     assert sum_sample.value == pytest.approx(0.456, rel=1e-2)
     assert count_sample.value == 1
+
+
+def test_event_missing_optional_fields():
+    incomplete_event = {
+        "agent_id": "agent1",  # Only agent_id present
+    }
+
+    state_mock = MagicMock()
+    state_mock.get_http_events.return_value = [incomplete_event]
+
+    exporter = PromMetricsExporter(state_provider=lambda: state_mock)
+
+    with patch("dashcorn.dashboard.prom_metrics_exporter.logger.warning") as warn_log:
+        exporter.aggregate_http_events()
+
+        # Because agent_id exists. So this should not be called.
+        # If called, we fail:
+        assert not any("'agent_id' not found" in call.args[0] for call in warn_log.call_args_list)
+
+        assert any("Incomplete HTTP event fields" in call.args[0] for call in warn_log.call_args_list)
+
+        # Check metrics fallback values are inserted
+        assert exporter._accum_total[("agent1", "unknown", "unknown", "000")] == 1
+        assert exporter._accum_duration_sum[("agent1", "unknown", "unknown")] == 0.0
+        assert exporter._accum_duration_count[("agent1", "unknown", "unknown")] == 1
+        assert exporter._accum_by_worker[("agent1", "0")] == 1
+
+def test_event_missing_agent_id():
+    event = dict(
+        agent_id="agent123",
+        method="GET",
+        path="/test",
+        status=200,
+        duration=0.1,
+        time=time.time(),
+        pid=1234,
+    )
+    del event["agent_id"]
+
+    state_mock = MagicMock()
+    state_mock.get_http_events.return_value = [event]
+
+    exporter = PromMetricsExporter(state_provider=lambda: state_mock)
+
+    with patch("dashcorn.dashboard.prom_metrics_exporter.logger.warning") as warn_log:
+        exporter.aggregate_http_events()
+
+        # Should skip the event and log warning
+        warn_log.assert_any_call("'agent_id' not found in http_event: {}".format(event))
+        assert len(exporter._accum_total) == 0
