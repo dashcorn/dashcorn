@@ -10,6 +10,9 @@ from dashcorn.dashboard.prom_metrics_exporter import PromMetricsExporter
 from dashcorn.dashboard.prom_metrics_scheduler import PromMetricsScheduler
 from dashcorn.dashboard.prom_metrics_server import PromMetricsServer
 
+from dashcorn.dashboard.process_executor import ProcessExecutor
+from dashcorn.dashboard.process_manager import ProcessManager
+
 import dashcorn.utils.logging
 
 config = DashboardConfig()
@@ -33,7 +36,13 @@ prom_metrics_exporter = PromMetricsExporter(lambda: store)
 prom_metrics_scheduler = PromMetricsScheduler(prom_metrics_exporter)
 prom_metrics_server = PromMetricsServer(prom_metrics_exporter)
 
+process_executor = ProcessExecutor()
+process_manager = ProcessManager(
+    process_executor=process_executor,
+)
+
 def start_threads():
+    process_manager.start()
     prom_metrics_server.start()
     prom_metrics_scheduler.start()
     metrics_collector.start()
@@ -45,6 +54,7 @@ def stop_threads():
     metrics_collector.stop()
     prom_metrics_scheduler.stop()
     prom_metrics_server.stop()
+    process_manager.stop()
 
 app = FastAPI(
     on_startup=[start_threads],

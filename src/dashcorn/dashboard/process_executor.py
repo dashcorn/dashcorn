@@ -1,10 +1,13 @@
 import subprocess, os, json, signal, time, threading, psutil, sys
+import logging
 
 from pathlib import Path
 from typing import Optional
 
 PM_FILE = Path.home() / ".config" / "dashcorn" / "running.json"
 PM_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger(__name__)
 
 class ProcessExecutor:
     def __init__(self):
@@ -28,9 +31,11 @@ class ProcessExecutor:
             workers: Optional[int] = None,
             cwd: Optional[str] = None,
     ):
+        result = dict(status="ok")
+
         if name in self.processes:
-            print(f"[dashcorn] Process '{name}' already exists.")
-            return
+            result.update(status="already_exists")
+            return result
 
         env = os.environ.copy()
 
@@ -55,7 +60,7 @@ class ProcessExecutor:
                 pass
             exec_args += ["--workers", str(workers)]
 
-        print(f"[dashcorn] Starting process '{name}'...")
+        logger.debug(f"[dashcorn] Starting process '{name}'...")
         proc = subprocess.Popen(exec_args,
             env=env,
             cwd=cwd,
@@ -69,37 +74,54 @@ class ProcessExecutor:
         }
         self.save()
 
+        result.update(proc=dict(self.processes[name]))
+        return result
+
     def stop(self, name):
+        result = dict(status="ok")
         if name not in self.processes:
-            print(f"[dashcorn] Process '{name}' not found.")
-            return
+            result.update(status="not_found")
+            return result
         pid = self.processes[name]["pid"]
+        result.update(pid=pid)
         try:
             os.kill(pid, signal.SIGTERM)
-            print(f"[dashcorn] Stopped process '{name}' (PID: {pid})")
+            result.update(status="ok")
         except ProcessLookupError:
-            print(f"[dashcorn] Process '{name}' already stopped.")
-        self.processes.pop(name)
-        self.save()
+            result.update(status="already_stopped")
+        finally:
+            self.processes.pop(name)
+            self.save()
+        return result
 
     def restart(self, name):
+        result = dict(status="ok")
         if name not in self.processes:
-            print(f"[dashcorn] Process '{name}' not found.")
-            return
+            result.update(status="not_found")
+            return result
         app_path = self.processes[name]["app_path"]
         self.stop(name)
         time.sleep(1)
         self.start(name, app_path)
+        return result
 
     def list(self):
-        print(f"{'Name':<15}{'PID':<8}{'Status':<10}{'App Path'}")
-        print("-" * 60)
+        result = dict(status="ok")
+        procs = []
         for name, meta in self.processes.items():
             pid = meta["pid"]
-            status = "Running" if psutil.pid_exists(pid) else "Crashed"
-            print(f"{name:<15}{pid:<8}{status:<10}{meta['app_path']}")
+            if psutil.pid_exists(pid):
+                procs.append(dict(name=name, pid=pid, status="running", app_path=meta.get("app_path")))
+            else:
+                procs.append(dict(name=name, pid=pid, status="crashed", app_path=meta.get("app_path")))
+        result.update(processes=procs)
+        return result
 
     def delete(self, name):
+        result = dict(status="ok")
+        if name not in self.processes:
+            result.update(status="not_found")
+            return result
         self.processes.pop(name, None)
         self.save()
-        print(f"[dashcorn] Deleted process '{name}' from list.")
+        return result
