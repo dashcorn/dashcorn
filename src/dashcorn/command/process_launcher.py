@@ -1,10 +1,13 @@
 from dashcorn.dashboard.process_executor import ProcessExecutor
 
-import zmq
-import json
+import os
 import logging
+import zmq
 
 from typing import Optional
+
+DEFAULT_SOCKET_PATH = "/tmp/dashcorn-pm.sock"
+DEFAULT_TIMEOUT_MS = int(os.getenv("DASHCORN_ZMQ_TIMEOUT_MS", "5000"))
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +15,17 @@ class ProcessLauncher:
     def __init__(
         self,
         protocol: str = "ipc",
-        address: str = "/tmp/dashcorn-pm.sock",
+        address: str = DEFAULT_SOCKET_PATH,
         endpoint: str = None,
+        timeout_ms: int = DEFAULT_TIMEOUT_MS,
     ):
         self._endpoint = endpoint or f"{protocol}://{address}"
+        self._timeout_ms = timeout_ms
 
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.REQ)
+        self._socket.RCVTIMEO = self._timeout_ms
+        self._socket.LINGER = 0  # avoid long waits when closing
         self._socket.connect(self._endpoint)
 
     def send_command(self, cmd: str, args: Optional[dict] = None) -> dict:
