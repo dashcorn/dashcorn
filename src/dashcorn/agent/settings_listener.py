@@ -5,14 +5,15 @@ import zmq
 
 from typing import Callable, Optional
 
+from dashcorn.commons import consts
 from dashcorn.utils.zmq_util import Protocol
 
 logger = logging.getLogger(__name__)
 
 class SettingsListener():
     def __init__(self, protocol: Protocol = "tcp",
-            host="127.0.0.1",
-            port=5557,
+            host=consts.ZMQ_CONNECTION_CONTROL_HOST,
+            port=consts.ZMQ_CONNECTION_CONTROL_PORT,
             address: Optional[str] = None,
             endpoint: Optional[str] = None,
             handle_message: Optional[Callable]=None,

@@ -5,6 +5,7 @@ import time
 
 from typing import Optional
 
+from dashcorn.commons import consts
 from dashcorn.dashboard.realtime_metrics import RealtimeState
 from dashcorn.utils.zmq_util import Protocol, renew_zmq_ipc_socket
 
@@ -18,13 +19,13 @@ class MetricsCollector:
 
     def __init__(self,
             protocol: Protocol = "tcp",
-            address: Optional[str] = "*:5556",
+            address: Optional[str] = f"*:{consts.ZMQ_CONNECTION_METRICS_PORT}",
             endpoint: Optional[str] = None,
             state_store: Optional[RealtimeState] = None):
         """
         Initialize the MetricsCollector.
 
-        :param endpoint: ZMQ bind address, typically 'tcp://*:5556'
+        :param endpoint: ZMQ bind address, typically 'tcp://*:5555'
         """
         self._protocol = protocol
         self._address = renew_zmq_ipc_socket(address, protocol)

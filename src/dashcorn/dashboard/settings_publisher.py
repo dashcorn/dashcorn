@@ -3,9 +3,10 @@ import time
 import logging
 from typing import Optional
 
-logger = logging.getLogger(__name__)
-
+from dashcorn.commons import consts
 from dashcorn.utils.zmq_util import Protocol, renew_zmq_ipc_socket
+
+logger = logging.getLogger(__name__)
 
 class SettingsPublisher:
     """
@@ -13,7 +14,8 @@ class SettingsPublisher:
     """
 
     def __init__(self, protocol: Protocol = "tcp",
-            host: str = "127.0.0.1", port: int = 5557,
+            host: str = consts.ZMQ_CONNECTION_CONTROL_HOST,
+            port: int = consts.ZMQ_CONNECTION_CONTROL_PORT,
             address: Optional[str] = None,
             endpoint: Optional[str] = None,
             context: Optional[zmq.Context] = None,

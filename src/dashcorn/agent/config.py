@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
+from dashcorn.commons import consts
+
 def env_bool(key: str, default: str = "false") -> bool:
     return os.getenv(key, default).strip().lower() == "true"
 
@@ -14,9 +16,11 @@ def env_float(key: str, default: str = "5.0") -> float:
 @dataclass
 class AgentConfig:
     zmq_report_protocol: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_REPORT_PROTOCOL", "tcp"))
-    zmq_report_addr: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_REPORT_ADDR", "127.0.0.1:5556"))
+    zmq_report_addr: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_REPORT_ADDR",
+            f"{consts.ZMQ_CONNECTION_METRICS_HOST}:{consts.ZMQ_CONNECTION_METRICS_PORT}"))
     zmq_control_protocol: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_CONTROL_PROTOCOL", "tcp"))
-    zmq_control_addr: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_CONTROL_ADDR", "127.0.0.1:5557"))
+    zmq_control_addr: str = field(default_factory=lambda: os.getenv("DASHCORN_ZMQ_CONTROL_ADDR",
+            f"{consts.ZMQ_CONNECTION_CONTROL_HOST}:{consts.ZMQ_CONNECTION_CONTROL_PORT}"))
     use_curve_auth: bool = field(default_factory=lambda: env_bool("DASHCORN_USE_CURVE", "false"))
     cert_dir: Optional[str] = field(default_factory=lambda: os.getenv("DASHCORN_CERT_DIR"))
     interval_seconds: float = field(default_factory=lambda: env_float("DASHCORN_INTERVAL", "5.0"))

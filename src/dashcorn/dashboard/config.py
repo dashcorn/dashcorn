@@ -2,16 +2,18 @@ import os
 from dataclasses import dataclass, asdict, field
 from typing import Optional
 
+from dashcorn.commons import consts
+
 @dataclass
 class DashboardConfig:
     zmq_pub_control_protocol: str = field(default_factory=lambda:
         os.getenv("DASHCORN_ZMQ_PUB_CONTROL_PROTOCOL", "tcp"))
     zmq_pub_control_address: str = field(default_factory=lambda:
-        os.getenv("DASHCORN_ZMQ_PUB_CONTROL_ADDRESS", "*:5557"))
+        os.getenv("DASHCORN_ZMQ_PUB_CONTROL_ADDRESS", f"*:{consts.ZMQ_CONNECTION_CONTROL_PORT}"))
     zmq_pull_metrics_protocol: str = field(default_factory=lambda:
         os.getenv("DASHCORN_ZMQ_PULL_METRICS_PROTOCOL", "tcp"))
     zmq_pull_metrics_address: str = field(default_factory=lambda:
-        os.getenv("DASHCORN_ZMQ_PULL_METRICS_ADDRESS", "*:5556"))
+        os.getenv("DASHCORN_ZMQ_PULL_METRICS_ADDRESS", f"*:{consts.ZMQ_CONNECTION_METRICS_PORT}"))
     use_curve_auth: bool = field(default_factory=lambda:
         os.getenv("DASHCORN_USE_CURVE", "false").lower() == "true")
     cert_dir: Optional[str] = field(default_factory=lambda:

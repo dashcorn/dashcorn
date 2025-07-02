@@ -3,6 +3,7 @@ import logging
 
 from typing import Optional
 
+from dashcorn.commons import consts
 from dashcorn.utils.zmq_util import Protocol
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class MetricsSender:
 
     Attributes:
         host (str): The hostname of the dashboard (default "127.0.0.1").
-        port (int): The port of the dashboard's ZMQ PULL socket (default 5556).
+        port (int): The port of the dashboard's ZMQ PULL socket.
         context (zmq.Context): The ZMQ context used to create the socket.
         logging_enabled (bool): Whether debug logging is enabled.
     """
@@ -25,8 +26,8 @@ class MetricsSender:
     def __init__(
         self,
         protocol: Protocol = "tcp",
-        host: str = "127.0.0.1",
-        port: int = 5556,
+        host: str = consts.ZMQ_CONNECTION_METRICS_HOST,
+        port: int = consts.ZMQ_CONNECTION_METRICS_PORT,
         address: Optional[str] = None,
         endpoint: Optional[str] = None,
         context: Optional[zmq.Context] = None,
