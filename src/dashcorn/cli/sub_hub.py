@@ -23,12 +23,16 @@ def start(
     print(f"[cyan]Starting Dashcorn Hub at http://{actual_host}:{actual_port}[/cyan]")
 
     subprocess.run([
-        "uvicorn",
-        "dashcorn.dashboard.main:app",
-        "--host", actual_host,
-        "--port", str(actual_port),
-        "--reload"
-    ])
+            "uvicorn",
+            "dashcorn.hub.server:app",
+            "--host", actual_host,
+            "--port", str(actual_port),
+            "--reload"
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
 
 @hub_app.command()
 def status():

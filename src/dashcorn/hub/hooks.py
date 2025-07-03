@@ -1,5 +1,3 @@
-from fastapi import FastAPI
-
 from dashcorn.dashboard.config import DashboardConfig
 from dashcorn.dashboard.realtime_metrics import RealtimeState
 from dashcorn.dashboard.settings_selector import SettingsSelector
@@ -12,8 +10,6 @@ from dashcorn.dashboard.prom_metrics_server import PromMetricsServer
 
 from dashcorn.dashboard.process_executor import ProcessExecutor
 from dashcorn.dashboard.process_manager import ProcessManager
-
-import dashcorn.utils.logging
 
 config = DashboardConfig()
 
@@ -47,6 +43,7 @@ def start_threads():
     prom_metrics_scheduler.start()
     metrics_collector.start()
     settings_selector.start()
+    settings_publisher.open()
 
 def stop_threads():
     settings_publisher.close()
@@ -55,16 +52,3 @@ def stop_threads():
     prom_metrics_scheduler.stop()
     prom_metrics_server.stop()
     process_manager.stop()
-
-app = FastAPI(
-    on_startup=[start_threads],
-    on_shutdown=[stop_threads],
-)
-
-@app.get("/metrics")
-def get_metrics():
-    return store.dict()
-
-@app.get("/")
-def root():
-    return {"status": "Dashcorn dashboard running"}

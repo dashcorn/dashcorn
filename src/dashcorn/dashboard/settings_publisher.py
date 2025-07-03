@@ -38,6 +38,7 @@ class SettingsPublisher:
         self._delay = delay_before_send
         self._publish_log_enabled = publish_log_enabled
 
+    def open(self):
         try:
             self._socket.bind(self._endpoint)
             logger.debug(f"[{self.__class__.__name__}] bound to {self._endpoint}")
