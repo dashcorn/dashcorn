@@ -9,17 +9,20 @@ from typing import Callable, List
 
 logger = logging.Logger(__name__)
 
-PID_FILE = Path.home() / ".config" / "dashcorn" / "hub.pid"
-PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+class classproperty(property):
+    def __get__(self, obj, objtype=None):
+        return self.fget(objtype)
 
 class LifecycleService:
     def __init__(
         self,
         on_startup: List[Callable[[], None]] = None,
         on_shutdown: List[Callable[[], None]] = None,
+        self_managed: bool = False,
     ):
         self.on_startup = on_startup or []
         self.on_shutdown = on_shutdown or []
+        self._self_managed = self_managed
         self._stop_event = threading.Event()
         self._thread = None
 
@@ -28,11 +31,12 @@ class LifecycleService:
             logger.debug(f"[{self.__class__.__name__}] Server already running.")
             return
 
-        if self._is_already_running():
-            logger.warning(f"[{self.__class__.__name__}] Server already running. Aborting startup.")
-            return
+        if self._self_managed:
+            if self._is_already_running():
+                logger.warning(f"[{self.__class__.__name__}] Server already running. Aborting startup.")
+                return
 
-        self._write_pid_file()
+            self._write_pid_file()
 
         logger.debug(f"[{self.__class__.__name__}] Starting server ...")
 
@@ -63,7 +67,9 @@ class LifecycleService:
         if self._thread:
             self._thread.join(timeout=5)
 
-        self._remove_pid_file()
+        if self._self_managed:
+            self._remove_pid_file()
+
         logger.debug(f"[{self.__class__.__name__}] Server stopped.")
 
     def restart(self):
@@ -79,23 +85,35 @@ class LifecycleService:
         print(f"[{self.__class__.__name__}] heartbeat ...")
         time.sleep(2)
 
-    def _write_pid_file(self):
-        with open(PID_FILE, "w") as f:
-            f.write(str(os.getpid()))
-        logger.debug(f"PID written to {PID_FILE}")
+    _pid_file = None
 
+    @classproperty
+    def pid_file(cls):
+        if cls._pid_file is None:
+            cls._pid_file = Path.home() / ".config" / "dashcorn" / "hub.pid"
+            cls._pid_file.parent.mkdir(parents=True, exist_ok=True)
+        return cls._pid_file
+
+    @classmethod
+    def _write_pid_file(self):
+        with open(self.pid_file, "w") as f:
+            f.write(str(os.getpid()))
+        logger.debug(f"PID written to {self.pid_file}")
+
+    @classmethod
     def _remove_pid_file(self):
         try:
-            PID_FILE.unlink()
-            logger.debug(f"PID file {PID_FILE} removed.")
+            self.pid_file.unlink()
+            logger.debug(f"PID file {self.pid_file} removed.")
         except FileNotFoundError:
             pass
 
+    @classmethod
     def _is_already_running(self) -> bool:
-        if not PID_FILE.exists():
+        if not self.pid_file.exists():
             return False
         try:
-            with open(PID_FILE, "r") as f:
+            with open(self.pid_file, "r") as f:
                 pid = int(f.read().strip())
             os.kill(pid, 0)  # Gửi tín hiệu 0 để kiểm tra tồn tại
         except (ValueError, ProcessLookupError, PermissionError, OSError):
