@@ -32,11 +32,11 @@ class LifecycleService:
             return
 
         if self._self_managed:
-            if self._is_already_running():
+            if self.is_pid_alive():
                 logger.warning(f"[{self.__class__.__name__}] Server already running. Aborting startup.")
                 return
 
-            self._write_pid_file()
+            self.write_pid_file()
 
         logger.debug(f"[{self.__class__.__name__}] Starting server ...")
 
@@ -68,7 +68,7 @@ class LifecycleService:
             self._thread.join(timeout=5)
 
         if self._self_managed:
-            self._remove_pid_file()
+            self.remove_pid_file()
 
         logger.debug(f"[{self.__class__.__name__}] Server stopped.")
 
@@ -95,13 +95,20 @@ class LifecycleService:
         return cls._pid_file
 
     @classmethod
-    def _write_pid_file(self):
+    def read_pid_file(cls):
+        try:
+            return int(cls.pid_file.read_text())
+        except Exception:
+            return 0
+
+    @classmethod
+    def write_pid_file(self):
         with open(self.pid_file, "w") as f:
             f.write(str(os.getpid()))
         logger.debug(f"PID written to {self.pid_file}")
 
     @classmethod
-    def _remove_pid_file(self):
+    def remove_pid_file(self):
         try:
             self.pid_file.unlink()
             logger.debug(f"PID file {self.pid_file} removed.")
@@ -109,7 +116,7 @@ class LifecycleService:
             pass
 
     @classmethod
-    def _is_already_running(self) -> bool:
+    def is_pid_alive(self) -> bool:
         if not self.pid_file.exists():
             return False
         try:

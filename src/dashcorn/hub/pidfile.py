@@ -1,28 +1,13 @@
-import os
-
-from pathlib import Path
-
-PID_FILE = Path.home() / ".config" / "dashcorn" / "hub.pid"
+from dashcorn.dashboard.lifecycle_service import LifecycleService
 
 def is_hub_running() -> bool:
-    if not PID_FILE.exists():
-        return False
-    try:
-        pid = int(PID_FILE.read_text())
-        os.kill(pid, 0)  # kiểm tra tiến trình còn sống
-        return True
-    except Exception:
-        return False
+    return LifecycleService.is_pid_alive()
 
 def read_pid():
-    return PID_FILE.read_text()
+    return LifecycleService.read_pid_file()
 
 def write_pid():
-    PID_FILE.parent.mkdir(parents=True, exist_ok=True)
-    PID_FILE.write_text(str(os.getpid()))
+    return LifecycleService.write_pid_file()
 
 def clear_pid():
-    try:
-        PID_FILE.unlink()
-    except FileNotFoundError:
-        pass
+    return LifecycleService.remove_pid_file()
