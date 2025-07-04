@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class ProcessManager:
     def __init__(self,
-            protocol: str = "ipc",
+            protocol: Protocol = "ipc",
             address: str = "/tmp/dashcorn-pm.sock",
             endpoint: str = None,
             process_executor: Optional[ProcessExecutor] = None,
