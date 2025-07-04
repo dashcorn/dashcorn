@@ -20,7 +20,7 @@ def run():
         raise typer.Exit()
 
     proc = subprocess.Popen(
-        [ sys.executable, "-m", "dashcorn.hub.runner" ],
+        [ sys.executable, "-m", "dashcorn.hub.daemon" ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
