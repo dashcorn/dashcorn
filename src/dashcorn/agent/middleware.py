@@ -31,10 +31,7 @@ from starlette.responses import Response
 from dashcorn.commons.agent_info_util import get_agent_id
 
 from .config import AgentConfig
-from .worker_sender import MetricsSender
-from .settings_store import SettingsStore
-from .settings_listener import SettingsListener
-from .worker_reporter import WorkerReporter
+from .bootstrap import start_dashcorn_agent
 
 X_REQUEST_ID = "X-Request-Id"
 
@@ -84,23 +81,8 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         logger.debug(f"👷 [{self.__class__.__name__}] PID: {self._pid}, Parent PID: {self._parent_pid}")
 
-        self._settings_store = SettingsStore()
+        self._metrics_sender = start_dashcorn_agent(config=self._config).get("metrics_sender")
 
-        self._settings_listener = SettingsListener(
-                address=self._config.zmq_control_address,
-                protocol=self._config.zmq_control_protocol,
-                handle_message=self._settings_store.update_settings)
-        self._settings_listener.start()
-
-        self._metrics_sender = MetricsSender(
-                address=self._config.zmq_metrics_address,
-                protocol=self._config.zmq_metrics_protocol,
-                logging_enabled=self._config.enable_logging)
-
-        self._worker_reporter = WorkerReporter(interval=4.0,
-            settings_store=self._settings_store,
-            metrics_sender=self._metrics_sender)
-        self._worker_reporter.start()
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         """
