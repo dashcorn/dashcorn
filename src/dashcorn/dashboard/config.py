@@ -15,9 +15,9 @@ class DashboardConfig:
     zmq_pull_metrics_address: str = field(default_factory=lambda:
         os.getenv("DASHCORN_ZMQ_PULL_METRICS_ADDRESS", f"*:{consts.ZMQ_CONNECTION_METRICS_PORT}"))
     use_curve_auth: bool = field(default_factory=lambda:
-        os.getenv("DASHCORN_USE_CURVE", "false").lower() == "true")
+        os.getenv("DASHCORN_ZMQ_USE_CURVE", "false").lower() == "true")
     cert_dir: Optional[str] = field(default_factory=lambda:
-        os.getenv("DASHCORN_CERT_DIR"))
+        os.getenv("DASHCORN_ZMQ_CERT_DIR"))
     leader_rotation_interval: float = field(default_factory=lambda:
         float(os.getenv("DASHCORN_LEADER_ROTATE_INTERVAL", "5.0")))
     enable_logging: bool = field(default_factory=lambda:

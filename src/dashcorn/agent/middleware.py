@@ -87,14 +87,14 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         self._settings_store = SettingsStore()
 
         self._settings_listener = SettingsListener(
-                address=self._config.zmq_control_addr,
+                address=self._config.zmq_control_address,
                 protocol=self._config.zmq_control_protocol,
                 handle_message=self._settings_store.update_settings)
         self._settings_listener.start()
 
         self._metrics_sender = MetricsSender(
-                address=self._config.zmq_report_addr,
-                protocol=self._config.zmq_report_protocol,
+                address=self._config.zmq_metrics_address,
+                protocol=self._config.zmq_metrics_protocol,
                 logging_enabled=self._config.enable_logging)
 
         self._worker_reporter = WorkerReporter(interval=4.0,
