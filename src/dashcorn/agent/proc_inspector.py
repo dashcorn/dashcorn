@@ -51,17 +51,21 @@ def extract_process_info(proc) -> Dict:
         "num_threads": proc.num_threads(),
     }
 
-def get_worker_metrics(leader: Optional[int] = None, include_master: bool = False) -> dict:
+def get_worker_metrics(leader: Optional[int] = None,
+        heartbeat: Optional[int] = None,
+        include_master: bool = False) -> dict:
     worker = get_self_process_info()
     pid = worker.get("pid")
     master_pid = worker.get("parent_pid")
+    if heartbeat:
+        worker.update(heartbeat=heartbeat)
 
     if master_pid and (include_master or leader == pid):
         master = get_process_info_of(master_pid)
-        logger.debug(f"👷 pid: {pid} == leader: {leader} -> selected leader: {pid}")
+        logger.debug(f"👷 pid: {pid} == leader: {leader} #{heartbeat} -> selected leader: {pid}")
     else:
         master = {}
-        logger.debug(f"👷 pid: {pid} <> leader: {leader} -x")
+        logger.debug(f"👷 pid: {pid} <> leader: {leader} #{heartbeat} -x")
 
     return {
         "master": master,

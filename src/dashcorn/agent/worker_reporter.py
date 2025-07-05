@@ -56,7 +56,10 @@ class WorkerReporter:
                         "type": "worker_status",
                         "agent_id": self._agent_id,
                         "timestamp": time.time(),
-                        **get_worker_metrics(leader=self._settings_store.leader),
+                        **get_worker_metrics(
+                            leader=self._settings_store.leader,
+                            heartbeat=self._settings_store.heartbeat,
+                        ),
                     }
                     self._metrics_sender.send(metric)
                     if self._logging_enabled:

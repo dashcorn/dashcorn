@@ -19,6 +19,7 @@ class SettingsStore:
     leader: Optional[int] = None
     leader_since: float = field(default_factory=lambda: time.time())
     agent_id: str = field(default_factory=lambda: get_agent_id())
+    heartbeat: Optional[int] = None
 
     def update_leader(self, pid: int):
         """
@@ -47,7 +48,11 @@ class SettingsStore:
     def update_settings(self, data):
         if not isinstance(data, dict):
             return
-        _agent_id=data.get("agent_id", None)
+        _agent_id = data.get("agent_id", None)
         _leader = data.get("leader", None)
         if _leader and self.agent_id == _agent_id:
             self.update_leader(_leader)
+        if self.agent_id == _agent_id:
+            heartbeat = data.get("heartbeat", None)
+            if heartbeat:
+                self.heartbeat = heartbeat

@@ -77,11 +77,14 @@ class RealtimeState:
         leaders = []
 
         for agent_id, cache in self._server_state.items():
+            heartbeat = cache.get("heartbeat", 0)
+            cache["heartbeat"] = heartbeat + 1
+
             candidates = []
             for worker_id, worker in cache.get("workers",{}).items():
                 pid = worker.get("pid")
                 if pid:
-                    candidates.append(dict(agent_id=agent_id, leader=pid))
+                    candidates.append(dict(agent_id=agent_id, leader=pid, heartbeat=heartbeat))
 
             if not candidates:
                 logger.debug("No active workers found for leader election.")
