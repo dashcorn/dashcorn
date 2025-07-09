@@ -24,14 +24,13 @@ def start(
 
     subprocess.run([
             "uvicorn",
-            "dashcorn.hub.server:app",
+            "dashcorn.hub.webapp:app",
             "--host", actual_host,
             "--port", str(actual_port),
             "--reload"
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        start_new_session=True,
     )
 
 @hub_app.command()
